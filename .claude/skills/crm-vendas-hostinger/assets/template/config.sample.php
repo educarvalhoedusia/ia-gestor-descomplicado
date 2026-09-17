@@ -32,4 +32,11 @@ return [
     // Frase institucional que a IA pode encaixar (com naturalidade, não em
     // toda resposta) nas sugestões geradas. Deixe em branco para não usar.
     'frase_padrao' => '',
+
+    // Usada pela aba "Prospectar Clientes" (busca de empresas no Google
+    // Maps). Crie em console.cloud.google.com > APIs e Serviços > Credenciais,
+    // com a "Places API" ativada e faturamento configurado (tem cota
+    // gratuita mensal). Deixe em branco para desativar a aba sem quebrar o
+    // resto do painel.
+    'google_maps_api_key' => '',
 ];

@@ -96,6 +96,11 @@
   .vend-bar-row .n{ color:var(--ash-soft); }
 
   .toolbar{ display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1.1rem; }
+  .tabs{ display:flex; gap:.4rem; margin:1rem 0 1.2rem; border-bottom:1px solid var(--line); }
+  .tab-btn{ border:none; background:none; padding:.6em 1em; font-size:.9rem; font-weight:600; color:var(--ash); cursor:pointer; border-bottom:2px solid transparent; }
+  .tab-btn.active{ color:var(--violet-deep); border-bottom-color:var(--violet); }
+  .prospect-search-bar{ display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:.8rem; }
+  .prospect-search-bar input{ flex:1; min-width:200px; padding:.55em .8em; border:1px solid var(--line); border-radius:var(--radius-s); font-size:.9rem; }
   .toolbar input[type=search]{ max-width:220px; }
   .toolbar select{ max-width:150px; }
   .toolbar .spacer{ flex:1; }
@@ -217,6 +222,12 @@
     </div>
   </header>
 
+  <div class="tabs">
+    <button class="tab-btn active" id="tabContatos" data-view="contatos">📇 Contatos</button>
+    <button class="tab-btn" id="tabProspectar" data-view="prospectar">🧭 Prospectar Clientes</button>
+  </div>
+
+  <div id="viewContatos">
   <div class="banner" id="firstUseBanner" hidden>
     <span>📋</span>
     <div>
@@ -275,6 +286,47 @@
     </div>
   </div>
 
+  </div>
+
+  <div id="viewProspectar" hidden>
+    <div class="banner" id="prospectBanner">
+      <span>🧭</span>
+      <div>
+        <strong>Prospecção de clientes com IA.</strong>
+        Informe a cidade e o ramo de atuação (ex.: "clínica odontológica", "escritório de contabilidade")
+        que a IA busca empresas no Google Maps. Você revisa cada uma antes de virar lead de verdade.
+      </div>
+    </div>
+
+    <div class="prospect-search-bar">
+      <input type="text" id="pCidade" placeholder="Cidade (ex.: Campinas, SP)">
+      <input type="text" id="pRamo" placeholder="Ramo de atuação (ex.: clínica odontológica)">
+      <button class="btn btn-primary" id="btnBuscarProspects">🔍 Buscar empresas com IA</button>
+    </div>
+
+    <div class="toolbar">
+      <select id="pfStatus">
+        <option value="">Status (todos)</option>
+        <option value="novo">Novo</option>
+        <option value="contatado">Contatado</option>
+        <option value="respondeu">Respondeu</option>
+        <option value="descartado">Descartado</option>
+        <option value="virou_lead">Virou lead</option>
+      </select>
+      <span class="spacer"></span>
+    </div>
+
+    <div class="board">
+      <div class="list-panel">
+        <div class="count" id="prospectListCount">nenhuma busca feita ainda</div>
+        <div id="prospectListBody"></div>
+      </div>
+      <div class="detail-panel" id="prospectDetailPanel">
+        <div class="picker-empty">Busque empresas acima, ou selecione uma da lista à esquerda.</div>
+      </div>
+    </div>
+  </div>
+
   <p class="footer-note">EdusIA Instituto · Painel Comercial interno · dados armazenados em MySQL (Hostinger)</p>
 </div>
 
@@ -296,7 +348,7 @@
           <label>Origem do lead</label>
           <select required name="origem">
             <option value="">Selecione...</option>
-            <option>Indicação</option><option>Evento</option><option>Instagram</option><option>Site</option><option>Outro</option>
+            <option>Indicação</option><option>Evento</option><option>Instagram</option><option>Site</option><option>Prospecção IA</option><option>Outro</option>
           </select>
         </div>
       </div>
@@ -410,10 +462,13 @@
    "meuNomeLabel","btnTrocarSenha","btnSair","btnGerenciarEquipe","teamModalBackdrop","teamList","formNovoUsuario","btnFecharTeamModal",
    "btnSoAtrasados","btnRanking","btnExportExcel","btnExportPdf","lateBanner","btnRelatorioAcessos",
    "rankingModalBackdrop","rankingList","btnFecharRanking","accessModalBackdrop","accessList","btnFecharAccess",
-   "modalTitle","btnSubmitContato"
+   "modalTitle","btnSubmitContato",
+   "tabContatos","tabProspectar","viewContatos","viewProspectar",
+   "pCidade","pRamo","btnBuscarProspects","pfStatus","prospectListBody","prospectListCount","prospectDetailPanel"
   ].forEach(function(id){ els[id]=document.getElementById(id); });
 
-  var state = { contacts: [], sellers: [], selectedId: null, ready:false, token:"", meuNome:"", isAdmin:false, editingContactId:null, onlyLate:false };
+  var state = { contacts: [], sellers: [], selectedId: null, ready:false, token:"", meuNome:"", isAdmin:false, editingContactId:null, onlyLate:false,
+    prospects: [], selectedProspectId: null, prospectsLoaded:false };
 
   function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
@@ -1230,6 +1285,237 @@
         toast(e.message || "Não foi possível adicionar o membro.");
       }
     });
+
+    els.tabContatos.addEventListener("click", function(){ switchView("contatos"); });
+    els.tabProspectar.addEventListener("click", function(){ switchView("prospectar"); });
+
+    els.btnBuscarProspects.addEventListener("click", buscarProspects);
+    els.pfStatus.addEventListener("change", renderProspectList);
+  }
+
+  // ---------- Prospectar Clientes ----------
+  function switchView(view){
+    var isContatos = view === "contatos";
+    els.viewContatos.hidden = !isContatos;
+    els.viewProspectar.hidden = isContatos;
+    els.tabContatos.classList.toggle("active", isContatos);
+    els.tabProspectar.classList.toggle("active", !isContatos);
+    if(!isContatos && !state.prospectsLoaded){
+      loadProspects();
+    }
+  }
+
+  async function loadProspects(){
+    try{
+      var data = await api("list_prospects");
+      state.prospects = data || [];
+      state.prospectsLoaded = true;
+      renderProspectList();
+      renderProspectDetail();
+    }catch(e){
+      console.error(e);
+      toast(e.message || "Não foi possível carregar os prospects.");
+    }
+  }
+
+  async function buscarProspects(){
+    var cidade = els.pCidade.value.trim();
+    var ramo = els.pRamo.value.trim();
+    if(!cidade || !ramo){ toast("Preencha cidade e ramo de atuação."); return; }
+    var btn = els.btnBuscarProspects;
+    var textoOriginal = btn.textContent;
+    btn.disabled = true; btn.textContent = "Buscando...";
+    try{
+      var r = await api("prospect_search", {body:{cidade:cidade, ramo:ramo}});
+      state.prospectsLoaded = true;
+      toast(r.novos + " empresa(s) nova(s) encontrada(s) de " + r.total + " resultado(s).");
+      await loadProspects();
+    }catch(e){
+      console.error(e);
+      toast(e.message || "Não foi possível buscar no Google Maps.");
+    }finally{
+      btn.disabled = false; btn.textContent = textoOriginal;
+    }
+  }
+
+  var PROSPECT_STATUS = {
+    novo: {label:"Novo", cls:"stage-prospeccao"},
+    contatado: {label:"Contatado", cls:"stage-proposta"},
+    respondeu: {label:"Respondeu", cls:"stage-negociacao"},
+    descartado: {label:"Descartado", cls:"stage-perdido"},
+    virou_lead: {label:"Virou lead", cls:"stage-ganho"},
+  };
+
+  function getFilteredProspects(){
+    var st = els.pfStatus.value;
+    return state.prospects.filter(function(p){ return !st || p.status===st; });
+  }
+
+  function renderProspectList(){
+    var list = getFilteredProspects();
+    els.prospectListCount.textContent = list.length + (list.length===1 ? " prospect" : " prospects");
+    if(!list.length){
+      els.prospectListBody.innerHTML = '<div class="empty-state">Nenhum prospect encontrado. Busque acima por cidade e ramo de atuação.</div>';
+      return;
+    }
+    els.prospectListBody.innerHTML = list.map(function(p){
+      var st = PROSPECT_STATUS[p.status] || PROSPECT_STATUS.novo;
+      return '<div class="contact-card '+(p.id===state.selectedProspectId?"active":"")+'" data-id="'+esc(p.id)+'">' +
+        '<div class="name">'+esc(p.nome)+'</div>' +
+        '<div class="meta">'+esc(p.cidade||"—")+(p.ramo?" · "+esc(p.ramo):"")+'</div>' +
+        '<div class="tags-row"><span class="badge '+st.cls+'">'+st.label+'</span></div>' +
+      '</div>';
+    }).join("");
+
+    Array.prototype.forEach.call(els.prospectListBody.querySelectorAll(".contact-card"), function(card){
+      card.addEventListener("click", function(){
+        state.selectedProspectId = card.getAttribute("data-id");
+        renderProspectList();
+        renderProspectDetail();
+      });
+    });
+  }
+
+  function renderProspectDetail(){
+    var p = state.prospects.find(function(x){ return x.id===state.selectedProspectId; });
+    if(!p){
+      els.prospectDetailPanel.innerHTML = '<div class="picker-empty">Busque empresas acima, ou selecione uma da lista à esquerda.</div>';
+      return;
+    }
+    var st = PROSPECT_STATUS[p.status] || PROSPECT_STATUS.novo;
+
+    var html = '';
+    html += '<div class="detail-head"><div><h2>'+esc(p.nome)+'</h2>' +
+      '<div class="detail-sub">'+esc(p.cidade||"—")+(p.ramo?" · "+esc(p.ramo):"")+'</div></div>' +
+      '<div style="display:flex;gap:.5em;">' +
+      '<button class="btn btn-ghost btn-sm" id="btnDeleteProspect">Remover</button>' +
+      '</div></div>';
+
+    html += '<div class="kv-grid">' +
+      kv("Endereço", esc(p.endereco||"—")) +
+      kv("Telefone", esc(p.telefone||"—")) +
+      kv("Site", p.site ? '<a href="'+esc(p.site)+'" target="_blank" rel="noopener">'+esc(p.site)+'</a>' : "—") +
+      kv("Avaliação Google", p.rating!=null ? ('⭐ '+p.rating) : "—") +
+      kv("Vendedor responsável", esc(p.vendedor||"—")) +
+      kv("Status", '<span class="badge '+st.cls+'">'+st.label+'</span>') +
+    '</div>';
+
+    if(p.contactId){
+      html += '<div class="banner" style="margin-top:.8em;"><span>✅</span><div>Este prospect já virou lead no CRM.</div></div>';
+    }
+
+    html += '<div class="section-title">Registrar resposta do contato</div>';
+    html += '<form class="new-int-form" id="formProspectResposta">' +
+      '<div class="field"><label>O que a empresa respondeu (se já entrou em contato)</label>' +
+        '<textarea name="resposta" rows="3" placeholder="Cole aqui a resposta recebida...">'+esc(p.resposta||"")+'</textarea></div>' +
+      '<div class="field"><label>Status</label><select name="status">' +
+        Object.keys(PROSPECT_STATUS).map(function(k){ return '<option value="'+k+'"'+(k===p.status?" selected":"")+'>'+PROSPECT_STATUS[k].label+'</option>'; }).join("") +
+      '</select></div>' +
+      '<div class="form-actions"><button type="submit" class="btn btn-primary btn-sm">Salvar</button></div>' +
+    '</form>';
+
+    html += '<div class="section-title">🤖 Gerar mensagem de abordagem (IA)</div>';
+    html += '<div class="ai-reply-box">' +
+      '<div class="form-actions" style="justify-content:flex-start;">' +
+        '<button type="button" class="btn btn-ghost btn-sm" id="btnGerarEmail">✉️ Gerar para E-mail</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" id="btnGerarWhats">📱 Gerar para WhatsApp</button>' +
+      '</div>' +
+      '<div id="prospectMsgBox" hidden style="margin-top:.8rem;">' +
+        '<div class="field" id="prospectAssuntoField" hidden><label>Assunto (e-mail)</label><input id="prospectAssunto"></div>' +
+        '<div class="field"><label>Mensagem sugerida (revise antes de enviar)</label><textarea id="prospectMensagem" rows="7"></textarea></div>' +
+        '<div class="form-actions">' +
+          '<button type="button" class="btn btn-ghost btn-sm" id="btnEnviarEmail">✉️ Abrir e-mail</button>' +
+          '<button type="button" class="btn btn-primary btn-sm" id="btnEnviarWhats">📱 Abrir WhatsApp</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    if(!p.contactId){
+      html += '<div class="section-title">Virar lead no CRM</div>';
+      html += '<form class="new-int-form" id="formConverterLead">' +
+        '<div class="field field-req"><label>Nome do contato na empresa</label><input required name="nomeContato" placeholder="Quem você falou/vai falar"></div>' +
+        '<div class="row2">' +
+          '<div class="field field-req"><label>Telefone/WhatsApp</label><input required name="telefone" value="'+esc(p.telefone||"")+'"></div>' +
+          '<div class="field"><label>E-mail</label><input type="email" name="email"></div>' +
+        '</div>' +
+        '<div class="form-actions"><button type="submit" class="btn btn-primary btn-sm">✅ Adicionar como lead</button></div>' +
+      '</form>';
+    }
+
+    els.prospectDetailPanel.innerHTML = html;
+
+    document.getElementById("btnDeleteProspect").addEventListener("click", async function(){
+      if(!confirm('Remover "'+p.nome+'" da lista de prospects?')) return;
+      try{
+        await api("delete_prospect", {body:{id:p.id}});
+        state.selectedProspectId = null;
+        await loadProspects();
+      }catch(e){
+        console.error(e);
+        toast(e.message || "Não foi possível remover.");
+      }
+    });
+
+    document.getElementById("formProspectResposta").addEventListener("submit", async function(ev){
+      ev.preventDefault();
+      var fd = new FormData(ev.target);
+      try{
+        await api("save_prospect_response", {body:{id:p.id, resposta:fd.get("resposta")||"", status:fd.get("status")}});
+        toast("Resposta salva.");
+        await loadProspects();
+      }catch(e){
+        console.error(e);
+        toast(e.message || "Não foi possível salvar.");
+      }
+    });
+
+    function gerarMensagem(canal){
+      return async function(){
+        try{
+          var r = await api("prospect_generate_message", {body:{id:p.id, canal:canal}});
+          document.getElementById("prospectMsgBox").hidden = false;
+          document.getElementById("prospectAssuntoField").hidden = (canal!=="email");
+          if(canal==="email"){ document.getElementById("prospectAssunto").value = r.assunto||""; }
+          document.getElementById("prospectMensagem").value = r.mensagem||"";
+        }catch(e){
+          console.error(e);
+          toast(e.message || "Não foi possível gerar a mensagem.");
+        }
+      };
+    }
+    document.getElementById("btnGerarEmail").addEventListener("click", gerarMensagem("email"));
+    document.getElementById("btnGerarWhats").addEventListener("click", gerarMensagem("whatsapp"));
+
+    document.getElementById("btnEnviarEmail").addEventListener("click", function(){
+      if(!p.email){ toast("Este prospect não tem e-mail cadastrado — use o WhatsApp ou adicione o e-mail ao converter em lead."); return; }
+      var assunto = document.getElementById("prospectAssunto").value;
+      var corpo = document.getElementById("prospectMensagem").value;
+      window.location.href = "mailto:" + encodeURIComponent(p.email) + "?subject=" + encodeURIComponent(assunto) + "&body=" + encodeURIComponent(corpo);
+    });
+    document.getElementById("btnEnviarWhats").addEventListener("click", function(){
+      if(!p.telefone){ toast("Este prospect não tem telefone cadastrado."); return; }
+      var corpo = document.getElementById("prospectMensagem").value;
+      if(!corpo.trim()){ toast("Gere a mensagem primeiro."); return; }
+      window.open(buildWhatsAppLink(p.telefone, corpo), "_blank");
+    });
+
+    var formConverter = document.getElementById("formConverterLead");
+    if(formConverter){
+      formConverter.addEventListener("submit", async function(ev){
+        ev.preventDefault();
+        var fd = new FormData(ev.target);
+        try{
+          await api("convert_prospect_to_lead", {body:{
+            id:p.id, nomeContato:fd.get("nomeContato"), telefone:fd.get("telefone"), email:fd.get("email")||""
+          }});
+          toast("Lead criado! Veja na aba Contatos.");
+          await loadProspects();
+        }catch(e){
+          console.error(e);
+          toast(e.message || "Não foi possível converter em lead.");
+        }
+      });
+    }
   }
 
   async function loadTeamList(){

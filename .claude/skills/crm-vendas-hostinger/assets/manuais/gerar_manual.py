@@ -104,7 +104,8 @@ def build_story(styles, empresa, perfil, url_exemplo):
         toc_items = [
             "O que é o Painel Comercial", "Como entrar no painel",
             "Cadastrando um novo contato (lead)", "Perfil DISC e como convencer cada perfil",
-            "Assistente de resposta com IA", "Registrando conversas e propostas",
+            "Assistente de resposta com IA", "Prospectar Clientes (busca no Google Maps + IA)",
+            "Registrando conversas e propostas",
             "Editando ou removendo um contato", "Indicadores (KPIs) e filtros",
             "Alerta de follow-up atrasado", "Exportando dados (CSV, Excel e PDF)",
             "Ranking de vendas", "Administrador x Vendedor — o que cada um vê",
@@ -114,7 +115,8 @@ def build_story(styles, empresa, perfil, url_exemplo):
         toc_items = [
             "O que é o Painel Comercial", "Como entrar no painel",
             "Cadastrando um novo contato (lead)", "Perfil DISC e como convencer cada perfil",
-            "Assistente de resposta com IA", "Registrando conversas e propostas",
+            "Assistente de resposta com IA", "Prospectar Clientes (busca no Google Maps + IA)",
+            "Registrando conversas e propostas",
             "Editando ou removendo um contato", "Indicadores (KPIs) e filtros",
             "Alerta de follow-up atrasado", "Exportando dados (CSV, Excel e PDF)",
             "Ranking de vendas", "O que é exclusivo do administrador",
@@ -265,6 +267,47 @@ def build_story(styles, empresa, perfil, url_exemplo):
             "continua funcionando sem problema. Consulte o README.md do projeto para o passo a passo "
             "de configuração.",
             styles["BodySmall"]))
+
+    # ---------- 3d. Prospectar Clientes ----------
+    story.append(section("Prospectar Clientes (busca no Google Maps + IA)"))
+    story.append(Paragraph(
+        "A aba <b>\"🧭 Prospectar Clientes\"</b>, no topo do painel, ajuda a encontrar empresas em "
+        "potencial numa cidade, sem precisar já ter o contato:",
+        styles["Body"]))
+    story.append(bullets(styles, [
+        "Informe a <b>cidade</b> e o <b>ramo de atuação</b> (ex.: \"clínica odontológica\", "
+        "\"escritório de contabilidade\", \"imobiliária\") e clique em "
+        '<b>"🔍 Buscar empresas com IA"</b>.',
+        "As empresas encontradas no Google Maps aparecem como <b>prospects</b> numa lista separada — "
+        "não entram direto como lead no CRM, para você revisar antes.",
+        "Em cada prospect, você vê endereço, telefone, site e a nota do Google.",
+    ]))
+    story.append(Paragraph(
+        "<i>O Google Maps não usa código CNAE (isso é uma classificação da Receita Federal) — a busca "
+        "funciona por palavra-chave/ramo de negócio, o que na prática cobre o mesmo objetivo.</i>",
+        styles["BodySmall"]))
+    story.append(subsection("Abordando e convertendo um prospect"))
+    story.append(bullets(styles, [
+        'Clique em <b>"✉️ Gerar para E-mail"</b> ou <b>"📱 Gerar para WhatsApp"</b> para a IA escrever '
+        "uma mensagem de primeiro contato, já considerando o ramo de atuação da empresa.",
+        'Revise e clique em <b>"Abrir e-mail"</b> ou <b>"Abrir WhatsApp"</b> — abre pronto para enviar, '
+        "você decide o momento de apertar enviar.",
+        "Quando a empresa responder, registre a resposta no campo próprio e atualize o "
+        '<b>status</b> (Novo, Contatado, Respondeu, Descartado, Virou lead).',
+        'Se valer a pena seguir, clique em <b>"✅ Adicionar como lead"</b> — vira um contato de '
+        "verdade no CRM, na aba \"Contatos\", pronto para registrar conversas e propostas como "
+        "qualquer outro lead.",
+    ]))
+    if perfil == "admin":
+        story.append(Paragraph(
+            "Esse recurso depende de uma chave de API do Google Maps (Places API) configurada no "
+            "<b>config.php</b> (campo <code>google_maps_api_key</code>) e reaproveita a mesma chave "
+            "da Anthropic já usada no Assistente de resposta. Sem a chave do Google Maps, a busca "
+            "mostra uma mensagem de erro clara ao clicar — o resto do painel continua funcionando "
+            "sem problema. Consulte o README.md do projeto para o passo a passo de configuração.",
+            styles["BodySmall"]))
+
+    story.append(PageBreak())
 
     # ---------- 4. Conversas ----------
     story.append(section("Registrando conversas e propostas"))

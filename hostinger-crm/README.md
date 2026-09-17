@@ -260,6 +260,77 @@ conversa em branco.
 
 ---
 
+## Prospectar Clientes (busca no Google Maps + IA)
+
+A aba **"🧭 Prospectar Clientes"**, no topo do painel, ajuda o vendedor a
+encontrar empresas em potencial numa cidade, sem precisar já ter o
+contato: informa a **cidade** e o **ramo de atuação** (ex.: "clínica
+odontológica", "escritório de contabilidade", "imobiliária") e a IA busca
+no Google Maps. Cada empresa encontrada vira um **prospect** numa lista
+separada — não entra direto como lead no CRM, para o vendedor revisar
+antes.
+
+> ⚠️ O Google Maps não usa código CNAE (isso é uma classificação da
+> Receita Federal) — a busca funciona por palavra-chave/ramo de negócio,
+> que na prática cobre o mesmo objetivo.
+
+### O que dá para fazer com cada prospect
+
+- Ver endereço, telefone, site e nota do Google.
+- **Gerar mensagem de abordagem com IA**, separada para **e-mail** ou
+  **WhatsApp** — a IA já considera o ramo de atuação da empresa.
+- **Abrir no WhatsApp/e-mail** com a mensagem pronta (mesmo mecanismo do
+  assistente de resposta: o vendedor revisa e aperta enviar).
+- **Registrar a resposta** recebida e mudar o status (Novo, Contatado,
+  Respondeu, Descartado, Virou lead).
+- **"✅ Adicionar como lead"**: quando a empresa responde e vale a pena
+  seguir, transforma o prospect em contato de verdade no CRM (pede o
+  nome de quem respondeu, telefone e e-mail).
+
+### Ativando
+
+1. Crie um projeto no **Google Cloud Console** (console.cloud.google.com),
+   ative a **"Places API"** e configure uma forma de pagamento (tem cota
+   gratuita mensal, e cada busca custa poucos centavos).
+2. Em "APIs e Serviços" → "Credenciais", crie uma **API Key**. Por
+   segurança, restrinja essa chave para funcionar só com a Places API.
+3. Em `config.php`, adicione:
+   ```php
+   'google_maps_api_key' => 'SUA_CHAVE_AQUI',
+   ```
+4. Rode a migração SQL abaixo no phpMyAdmin (cria a tabela de prospects):
+   ```sql
+   CREATE TABLE IF NOT EXISTS prospects (
+     id VARCHAR(40) PRIMARY KEY,
+     place_id VARCHAR(120) NOT NULL UNIQUE,
+     nome VARCHAR(255) NOT NULL,
+     endereco VARCHAR(500) DEFAULT '',
+     cidade VARCHAR(120) DEFAULT '',
+     ramo VARCHAR(255) DEFAULT '',
+     telefone VARCHAR(60) DEFAULT '',
+     email VARCHAR(255) DEFAULT '',
+     site VARCHAR(255) DEFAULT '',
+     rating DECIMAL(2,1) DEFAULT NULL,
+     vendedor VARCHAR(120) NOT NULL,
+     status VARCHAR(30) NOT NULL DEFAULT 'novo',
+     resposta TEXT,
+     mensagem_sugerida TEXT,
+     contact_id VARCHAR(40) NULL,
+     created_at DATETIME NOT NULL,
+     INDEX idx_prospects_vendedor (vendedor),
+     INDEX idx_prospects_status (status)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+   ```
+5. Suba o `index.html` e o `api.php` atualizados. Pronto — a aba já
+   aparece no topo do painel para todo mundo.
+
+Se `google_maps_api_key` ficar em branco, a busca mostra um erro claro ao
+clicar — o resto do painel continua funcionando sem problema. A geração
+de mensagem por IA reaproveita a mesma `anthropic_api_key` já configurada
+para o assistente de resposta.
+
+---
+
 ## Se algo der errado
 
 | Mensagem/sintoma | O que fazer |

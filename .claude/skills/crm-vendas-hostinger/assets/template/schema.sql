@@ -74,3 +74,24 @@ CREATE TABLE IF NOT EXISTS interactions (
   INDEX idx_interactions_contact (contact_id),
   INDEX idx_interactions_followup (data_followup)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS prospects (
+  id VARCHAR(40) PRIMARY KEY,
+  place_id VARCHAR(120) NOT NULL UNIQUE,
+  nome VARCHAR(255) NOT NULL,
+  endereco VARCHAR(500) DEFAULT '',
+  cidade VARCHAR(120) DEFAULT '',
+  ramo VARCHAR(255) DEFAULT '',
+  telefone VARCHAR(60) DEFAULT '',
+  email VARCHAR(255) DEFAULT '',
+  site VARCHAR(255) DEFAULT '',
+  rating DECIMAL(2,1) DEFAULT NULL,
+  vendedor VARCHAR(120) NOT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'novo',
+  resposta TEXT,
+  mensagem_sugerida TEXT,
+  contact_id VARCHAR(40) NULL,
+  created_at DATETIME NOT NULL,
+  INDEX idx_prospects_vendedor (vendedor),
+  INDEX idx_prospects_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

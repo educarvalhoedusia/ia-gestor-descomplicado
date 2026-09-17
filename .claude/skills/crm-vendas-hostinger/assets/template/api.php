@@ -39,6 +39,66 @@ function uid(): string {
     return bin2hex(random_bytes(8));
 }
 
+function callAnthropic(array $config, string $system, string $userMessage, int $maxTokens = 700): string {
+    $apiKey = $config['anthropic_api_key'] ?? '';
+    if (!$apiKey) {
+        fail(500, 'Chave de IA não configurada. Adicione "anthropic_api_key" no config.php.');
+    }
+    $model = $config['ai_model'] ?? 'claude-haiku-4-5-20251001';
+
+    $ch = curl_init('https://api.anthropic.com/v1/messages');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTPHEADER => [
+            'x-api-key: ' . $apiKey,
+            'anthropic-version: 2023-06-01',
+            'content-type: application/json',
+        ],
+        CURLOPT_POSTFIELDS => json_encode([
+            'model' => $model,
+            'max_tokens' => $maxTokens,
+            'system' => $system,
+            'messages' => [['role' => 'user', 'content' => $userMessage]],
+        ]),
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false) {
+        fail(502, 'Falha ao conectar com a IA: ' . $curlError);
+    }
+    $decoded = json_decode($response, true);
+    if ($httpCode !== 200 || !isset($decoded['content'][0]['text'])) {
+        $errMsg = $decoded['error']['message'] ?? ('HTTP ' . $httpCode);
+        fail(502, 'Falha ao gerar texto com IA: ' . $errMsg);
+    }
+    return trim($decoded['content'][0]['text']);
+}
+
+function mapProspectRow(array $r): array {
+    return [
+        'id' => $r['id'],
+        'nome' => $r['nome'],
+        'endereco' => $r['endereco'],
+        'cidade' => $r['cidade'],
+        'ramo' => $r['ramo'],
+        'telefone' => $r['telefone'],
+        'email' => $r['email'],
+        'site' => $r['site'],
+        'rating' => $r['rating'] !== null ? (float)$r['rating'] : null,
+        'vendedor' => $r['vendedor'],
+        'status' => $r['status'],
+        'resposta' => $r['resposta'],
+        'mensagemSugerida' => $r['mensagem_sugerida'],
+        'contactId' => $r['contact_id'],
+        'createdAt' => str_replace(' ', 'T', $r['created_at']),
+    ];
+}
+
 function reqStr($v, string $field, bool $required = true): string {
     $s = is_string($v) ? trim($v) : '';
     if ($required && $s === '') fail(422, "Campo obrigatório ausente: $field");
@@ -351,12 +411,6 @@ switch ($action) {
             fail(403, 'Você só pode gerar sugestões para os próprios leads.');
         }
 
-        $apiKey = $config['anthropic_api_key'] ?? '';
-        if (!$apiKey) {
-            fail(500, 'Chave de IA não configurada. Adicione "anthropic_api_key" no config.php.');
-        }
-        $model = $config['ai_model'] ?? 'claude-haiku-4-5-20251001';
-
         $intStmt = $pdo->prepare('SELECT * FROM interactions WHERE contact_id = ? ORDER BY data_hora DESC LIMIT 5');
         $intStmt->execute([$contactId]);
         $interactions = array_reverse($intStmt->fetchAll());
@@ -398,38 +452,224 @@ switch ($action) {
                 . "reforçar o argumento), pode encaixar de forma natural — nunca robótica — uma "
                 . "variação desta frase institucional da empresa: \"{$fraseEmpresa}\"." : '');
 
-        $ch = curl_init('https://api.anthropic.com/v1/messages');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_HTTPHEADER => [
-                'x-api-key: ' . $apiKey,
-                'anthropic-version: 2023-06-01',
-                'content-type: application/json',
-            ],
-            CURLOPT_POSTFIELDS => json_encode([
-                'model' => $model,
-                'max_tokens' => 700,
-                'system' => $system,
-                'messages' => [['role' => 'user', 'content' => $contexto]],
-            ]),
-        ]);
+        $sugestao = callAnthropic($config, $system, $contexto, 700);
+        echo json_encode(['sugestao' => $sugestao]);
+        break;
+    }
+
+    case 'prospect_search': {
+        $cidade = reqStr($input['cidade'] ?? null, 'cidade');
+        $ramo = reqStr($input['ramo'] ?? null, 'ramo');
+
+        $apiKey = $config['google_maps_api_key'] ?? '';
+        if (!$apiKey) {
+            fail(500, 'Chave do Google Maps não configurada. Adicione "google_maps_api_key" no config.php.');
+        }
+
+        $query = $ramo . ' em ' . $cidade;
+        $url = 'https://maps.googleapis.com/maps/api/place/textsearch/json?query=' . urlencode($query)
+            . '&key=' . urlencode($apiKey) . '&language=pt-BR&region=br';
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20]);
         $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
         curl_close($ch);
-
         if ($response === false) {
-            fail(502, 'Falha ao conectar com a IA: ' . $curlError);
+            fail(502, 'Falha ao consultar o Google Maps: ' . $curlError);
         }
         $decoded = json_decode($response, true);
-        if ($httpCode !== 200 || !isset($decoded['content'][0]['text'])) {
-            $errMsg = $decoded['error']['message'] ?? ('HTTP ' . $httpCode);
-            fail(502, 'Falha ao gerar sugestão com IA: ' . $errMsg);
+        $status = $decoded['status'] ?? '';
+        if ($status !== 'OK' && $status !== 'ZERO_RESULTS') {
+            fail(502, 'Google Maps retornou erro: ' . $status . ' — ' . ($decoded['error_message'] ?? ''));
+        }
+        $results = array_slice($decoded['results'] ?? [], 0, 12);
+
+        $novos = 0;
+        $out = [];
+        foreach ($results as $r) {
+            $placeId = $r['place_id'] ?? null;
+            if (!$placeId) continue;
+
+            $exists = $pdo->prepare('SELECT * FROM prospects WHERE place_id = ?');
+            $exists->execute([$placeId]);
+            $row = $exists->fetch();
+
+            if (!$row) {
+                // Busca telefone/site só para lugares novos, para economizar chamadas de API paga.
+                $telefone = '';
+                $site = '';
+                $detUrl = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=' . urlencode($placeId)
+                    . '&fields=formatted_phone_number,website&key=' . urlencode($apiKey) . '&language=pt-BR';
+                $chd = curl_init($detUrl);
+                curl_setopt_array($chd, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15]);
+                $detResp = curl_exec($chd);
+                curl_close($chd);
+                if ($detResp !== false) {
+                    $det = json_decode($detResp, true);
+                    $telefone = $det['result']['formatted_phone_number'] ?? '';
+                    $site = $det['result']['website'] ?? '';
+                }
+
+                $id = uid();
+                $createdAt = date('Y-m-d H:i:s');
+                $pdo->prepare('
+                    INSERT INTO prospects (id, place_id, nome, endereco, cidade, ramo, telefone, site, rating, vendedor, status, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ')->execute([
+                    $id, $placeId, $r['name'] ?? '(sem nome)', $r['formatted_address'] ?? '', $cidade, $ramo,
+                    $telefone, $site, $r['rating'] ?? null, $meuNome, 'novo', $createdAt,
+                ]);
+                $novos++;
+                $row = [
+                    'id' => $id, 'nome' => $r['name'] ?? '(sem nome)', 'endereco' => $r['formatted_address'] ?? '',
+                    'cidade' => $cidade, 'ramo' => $ramo, 'telefone' => $telefone, 'email' => '', 'site' => $site,
+                    'rating' => $r['rating'] ?? null, 'vendedor' => $meuNome, 'status' => 'novo', 'resposta' => null,
+                    'mensagem_sugerida' => null, 'contact_id' => null, 'created_at' => $createdAt,
+                ];
+            }
+            $out[] = $row;
         }
 
-        echo json_encode(['sugestao' => trim($decoded['content'][0]['text'])]);
+        echo json_encode(['novos' => $novos, 'total' => count($out), 'prospects' => array_map('mapProspectRow', $out)]);
+        break;
+    }
+
+    case 'list_prospects': {
+        if ($isAdmin) {
+            $rows = $pdo->query('SELECT * FROM prospects ORDER BY created_at DESC')->fetchAll();
+        } else {
+            $stmt = $pdo->prepare('SELECT * FROM prospects WHERE vendedor = ? ORDER BY created_at DESC');
+            $stmt->execute([$meuNome]);
+            $rows = $stmt->fetchAll();
+        }
+        echo json_encode(array_map('mapProspectRow', $rows));
+        break;
+    }
+
+    case 'save_prospect_response': {
+        $id = reqStr($input['id'] ?? null, 'id');
+        $resposta = reqStr($input['resposta'] ?? null, 'resposta', false);
+        $status = reqStr($input['status'] ?? null, 'status', false);
+
+        $stmt = $pdo->prepare('SELECT * FROM prospects WHERE id = ?');
+        $stmt->execute([$id]);
+        $p = $stmt->fetch();
+        if (!$p) fail(404, 'Prospect não encontrado.');
+        if (!$isAdmin && trim($p['vendedor']) !== trim($meuNome)) {
+            fail(403, 'Você só pode editar os próprios prospects.');
+        }
+
+        $novoStatus = $status !== '' ? $status : $p['status'];
+        $pdo->prepare('UPDATE prospects SET resposta = ?, status = ? WHERE id = ?')
+            ->execute([$resposta, $novoStatus, $id]);
+        echo json_encode(['ok' => true]);
+        break;
+    }
+
+    case 'prospect_generate_message': {
+        $id = reqStr($input['id'] ?? null, 'id');
+        $canal = reqStr($input['canal'] ?? null, 'canal'); // 'email' ou 'whatsapp'
+
+        $stmt = $pdo->prepare('SELECT * FROM prospects WHERE id = ?');
+        $stmt->execute([$id]);
+        $p = $stmt->fetch();
+        if (!$p) fail(404, 'Prospect não encontrado.');
+        if (!$isAdmin && trim($p['vendedor']) !== trim($meuNome)) {
+            fail(403, 'Você só pode gerar mensagens para os próprios prospects.');
+        }
+
+        $empresaNome = $config['email_from_name'] ?? 'a empresa';
+        $fraseEmpresa = $config['frase_padrao'] ?? '';
+
+        $contexto = "Empresa prospectada: {$p['nome']}\n"
+            . "Endereço: {$p['endereco']}\n"
+            . "Ramo de atuação buscado: {$p['ramo']}\n"
+            . "Cidade: {$p['cidade']}\n"
+            . ($p['resposta'] ? "Resposta que essa empresa já deu anteriormente: \"{$p['resposta']}\"\n" : '')
+            . "\nEscreva uma mensagem de primeiro contato (abordagem fria) para essa empresa, via "
+            . ($canal === 'email' ? 'e-mail' : 'WhatsApp') . ", se apresentando e despertando interesse em "
+            . "conhecer os serviços.";
+
+        if ($canal === 'email') {
+            $system = "Você é um SDR (pré-vendas) de {$empresaNome}. Escreva um e-mail curto e profissional "
+                . "de primeiro contato (cold e-mail) para uma empresa prospectada, cujo único objetivo é "
+                . "conseguir uma resposta ou agendar uma conversa — não é para vender tudo de uma vez. "
+                . "Retorne EXATAMENTE neste formato, sem texto antes ou depois:\nASSUNTO: <linha de "
+                . "assunto>\nCORPO:\n<corpo do e-mail>\nO corpo deve ser objetivo (4-6 frases), sem ser "
+                . "genérico, mencionando o ramo de atuação da empresa. Termine com uma pergunta clara ou "
+                . "convite para uma breve conversa."
+                . ($fraseEmpresa ? " Pode encaixar, se fizer sentido, uma variação desta frase "
+                    . "institucional: \"{$fraseEmpresa}\"." : '');
+        } else {
+            $system = "Você é um SDR (pré-vendas) de {$empresaNome}. Escreva uma mensagem curta e direta de "
+                . "primeiro contato via WhatsApp para uma empresa prospectada — informal, como uma "
+                . "mensagem real de WhatsApp, 3-5 frases, mencionando o ramo de atuação da empresa, sem "
+                . "parecer robótica nem spam. Termine com uma pergunta simples que gere resposta. Não use "
+                . "aspas ao redor do texto nem assinatura formal."
+                . ($fraseEmpresa ? " Pode encaixar, se fizer sentido, uma variação desta frase "
+                    . "institucional: \"{$fraseEmpresa}\"." : '');
+        }
+
+        $texto = callAnthropic($config, $system, $contexto, 500);
+
+        $assunto = '';
+        $corpo = $texto;
+        if ($canal === 'email' && preg_match('/ASSUNTO:\s*(.+?)\n+CORPO:\s*(.+)/is', $texto, $m)) {
+            $assunto = trim($m[1]);
+            $corpo = trim($m[2]);
+        }
+
+        $pdo->prepare('UPDATE prospects SET mensagem_sugerida = ? WHERE id = ?')->execute([$corpo, $id]);
+
+        echo json_encode(['assunto' => $assunto, 'mensagem' => $corpo]);
+        break;
+    }
+
+    case 'convert_prospect_to_lead': {
+        $id = reqStr($input['id'] ?? null, 'id');
+        $nomeContato = reqStr($input['nomeContato'] ?? null, 'nomeContato');
+        $telefone = reqStr($input['telefone'] ?? null, 'telefone');
+        $email = reqStr($input['email'] ?? null, 'email', false);
+
+        $stmt = $pdo->prepare('SELECT * FROM prospects WHERE id = ?');
+        $stmt->execute([$id]);
+        $p = $stmt->fetch();
+        if (!$p) fail(404, 'Prospect não encontrado.');
+        if (!$isAdmin && trim($p['vendedor']) !== trim($meuNome)) {
+            fail(403, 'Você só pode converter os próprios prospects.');
+        }
+        if ($p['contact_id']) {
+            fail(409, 'Este prospect já foi convertido em lead.');
+        }
+
+        $contactId = uid();
+        $pdo->prepare('
+            INSERT INTO contacts (id, nome, empresa, cargo, telefone, email, origem, disc, vendedor, tags, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ')->execute([
+            $contactId, $nomeContato, $p['nome'], '', $telefone, $email, 'Prospecção IA', '', $p['vendedor'],
+            '[]', date('Y-m-d H:i:s'),
+        ]);
+
+        $pdo->prepare('UPDATE prospects SET status = ?, contact_id = ? WHERE id = ?')
+            ->execute(['virou_lead', $contactId, $id]);
+
+        echo json_encode(['ok' => true, 'contactId' => $contactId]);
+        break;
+    }
+
+    case 'delete_prospect': {
+        $id = reqStr($input['id'] ?? null, 'id');
+        $stmt = $pdo->prepare('SELECT vendedor FROM prospects WHERE id = ?');
+        $stmt->execute([$id]);
+        $p = $stmt->fetch();
+        if (!$p) fail(404, 'Prospect não encontrado.');
+        if (!$isAdmin && trim($p['vendedor']) !== trim($meuNome)) {
+            fail(403, 'Você só pode remover os próprios prospects.');
+        }
+        $pdo->prepare('DELETE FROM prospects WHERE id = ?')->execute([$id]);
+        echo json_encode(['ok' => true]);
         break;
     }
 

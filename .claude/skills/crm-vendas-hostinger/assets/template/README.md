@@ -208,6 +208,39 @@ preenchida.
 
 ---
 
+## Prospectar Clientes (busca no Google Maps + IA)
+
+A aba **"🧭 Prospectar Clientes"**, no topo do painel, ajuda o vendedor a
+encontrar empresas em potencial numa cidade: informa a **cidade** e o
+**ramo de atuação** (ex.: "clínica odontológica", "imobiliária") e a IA
+busca no Google Maps. Cada empresa vira um **prospect** numa lista
+separada — não entra direto como lead, para o vendedor revisar antes.
+
+> ⚠️ O Google Maps não usa código CNAE — a busca funciona por
+> palavra-chave/ramo de negócio.
+
+Para cada prospect dá para: ver endereço/telefone/site/nota, **gerar
+mensagem de abordagem com IA** (e-mail ou WhatsApp), **abrir no
+WhatsApp/e-mail** já com a mensagem pronta, **registrar a resposta**
+recebida e, quando valer a pena, **"✅ Adicionar como lead"** para virar
+contato de verdade no CRM.
+
+### Ativando
+
+1. No Google Cloud Console, ative a **"Places API"** e configure
+   faturamento (tem cota gratuita mensal).
+2. Crie uma **API Key** em "APIs e Serviços" → "Credenciais".
+3. Em `config.php`: `'google_maps_api_key' => 'SUA_CHAVE_AQUI',`
+4. Rode no phpMyAdmin a migração que cria a tabela `prospects` (veja
+   `schema.sql` do projeto — a tabela já vem criada em instalações novas).
+5. Suba o `index.html` e o `api.php` atualizados.
+
+Se `google_maps_api_key` ficar em branco, a busca mostra um erro claro ao
+clicar — o resto do painel continua funcionando. A geração de mensagem
+reaproveita a mesma `anthropic_api_key` do assistente de resposta.
+
+---
+
 ## Se algo der errado
 
 | Mensagem/sintoma | O que fazer |
