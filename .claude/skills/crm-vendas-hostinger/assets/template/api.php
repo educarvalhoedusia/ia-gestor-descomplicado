@@ -8,6 +8,14 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 @set_time_limit(90);
 
+register_shutdown_function(function () {
+    $e = error_get_last();
+    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Erro fatal no servidor: ' . $e['message'] . ' em ' . basename($e['file']) . ':' . $e['line']]);
+    }
+});
+
 $configFile = __DIR__ . '/config.php';
 if (!file_exists($configFile)) {
     http_response_code(500);
