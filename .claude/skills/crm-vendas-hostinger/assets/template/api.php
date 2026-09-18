@@ -44,6 +44,15 @@ try {
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: [];
 
+function httpGetSimple(string $url, int $timeoutSeconds) {
+    $context = stream_context_create(['http' => [
+        'method' => 'GET',
+        'timeout' => $timeoutSeconds,
+        'ignore_errors' => true,
+    ]]);
+    return @file_get_contents($url, false, $context);
+}
+
 function uid(): string {
     return bin2hex(random_bytes(8));
 }
@@ -481,13 +490,9 @@ switch ($action) {
         $url = 'https://maps.googleapis.com/maps/api/place/textsearch/json?query=' . urlencode($query)
             . '&key=' . urlencode($apiKey) . '&language=pt-BR&region=br';
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12, CURLOPT_CONNECTTIMEOUT => 6]);
-        $response = curl_exec($ch);
-        $curlError = curl_error($ch);
-        curl_close($ch);
+        $response = httpGetSimple($url, 12);
         if ($response === false) {
-            fail(502, 'Falha ao consultar o Google Maps: ' . $curlError);
+            fail(502, 'Falha ao consultar o Google Maps.');
         }
         $decoded = json_decode($response, true);
         $status = $decoded['status'] ?? '';
@@ -515,10 +520,7 @@ switch ($action) {
                 if ($novos < 5) {
                     $detUrl = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=' . urlencode($placeId)
                         . '&fields=formatted_phone_number,website&key=' . urlencode($apiKey) . '&language=pt-BR';
-                    $chd = curl_init($detUrl);
-                    curl_setopt_array($chd, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 5, CURLOPT_CONNECTTIMEOUT => 3]);
-                    $detResp = curl_exec($chd);
-                    curl_close($chd);
+                    $detResp = httpGetSimple($detUrl, 5);
                     if ($detResp !== false) {
                         $det = json_decode($detResp, true);
                         $telefone = $det['result']['formatted_phone_number'] ?? '';
