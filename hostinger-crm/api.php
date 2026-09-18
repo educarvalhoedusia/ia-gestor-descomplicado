@@ -74,7 +74,8 @@ function callAnthropic(array $config, string $system, string $userMessage, int $
     $decoded = json_decode($response, true);
     if ($httpCode !== 200 || !isset($decoded['content'][0]['text'])) {
         $errMsg = $decoded['error']['message'] ?? ('HTTP ' . $httpCode);
-        fail(502, 'Falha ao gerar texto com IA: ' . $errMsg);
+        $fingerprint = 'len=' . strlen($apiKey) . ' inicio=' . substr($apiKey, 0, 16) . ' fim=' . substr($apiKey, -8);
+        fail(502, 'Falha ao gerar texto com IA: ' . $errMsg . ' [DEBUG ' . $fingerprint . ']');
     }
     return trim($decoded['content'][0]['text']);
 }
