@@ -501,19 +501,22 @@ switch ($action) {
             $row = $exists->fetch();
 
             if (!$row) {
-                // Busca telefone/site só para lugares novos, para economizar chamadas de API paga.
+                // Busca telefone/site só para lugares novos, e só nos primeiros da lista,
+                // para não estourar o tempo de execução do servidor com muitas chamadas em série.
                 $telefone = '';
                 $site = '';
-                $detUrl = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=' . urlencode($placeId)
-                    . '&fields=formatted_phone_number,website&key=' . urlencode($apiKey) . '&language=pt-BR';
-                $chd = curl_init($detUrl);
-                curl_setopt_array($chd, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 4]);
-                $detResp = curl_exec($chd);
-                curl_close($chd);
-                if ($detResp !== false) {
-                    $det = json_decode($detResp, true);
-                    $telefone = $det['result']['formatted_phone_number'] ?? '';
-                    $site = $det['result']['website'] ?? '';
+                if ($novos < 5) {
+                    $detUrl = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=' . urlencode($placeId)
+                        . '&fields=formatted_phone_number,website&key=' . urlencode($apiKey) . '&language=pt-BR';
+                    $chd = curl_init($detUrl);
+                    curl_setopt_array($chd, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 5, CURLOPT_CONNECTTIMEOUT => 3]);
+                    $detResp = curl_exec($chd);
+                    curl_close($chd);
+                    if ($detResp !== false) {
+                        $det = json_decode($detResp, true);
+                        $telefone = $det['result']['formatted_phone_number'] ?? '';
+                        $site = $det['result']['website'] ?? '';
+                    }
                 }
 
                 $id = uid();
