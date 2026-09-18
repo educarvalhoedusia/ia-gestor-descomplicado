@@ -6,7 +6,7 @@ declare(strict_types=1);
 // Todas as respostas são JSON. Erros retornam {"error": "..."} com status HTTP != 200.
 
 header('Content-Type: application/json; charset=utf-8');
-@set_time_limit(45);
+@set_time_limit(90);
 
 $configFile = __DIR__ . '/config.php';
 if (!file_exists($configFile)) {
@@ -475,7 +475,7 @@ switch ($action) {
             . '&key=' . urlencode($apiKey) . '&language=pt-BR&region=br';
 
         $ch = curl_init($url);
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20]);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12, CURLOPT_CONNECTTIMEOUT => 6]);
         $response = curl_exec($ch);
         $curlError = curl_error($ch);
         curl_close($ch);
@@ -507,7 +507,7 @@ switch ($action) {
                 $detUrl = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=' . urlencode($placeId)
                     . '&fields=formatted_phone_number,website&key=' . urlencode($apiKey) . '&language=pt-BR';
                 $chd = curl_init($detUrl);
-                curl_setopt_array($chd, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15]);
+                curl_setopt_array($chd, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 4]);
                 $detResp = curl_exec($chd);
                 curl_close($chd);
                 if ($detResp !== false) {
