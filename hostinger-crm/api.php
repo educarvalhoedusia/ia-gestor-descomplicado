@@ -155,6 +155,7 @@ function requireAdmin($currentUser): void {
 $isAdmin = !empty($currentUser['is_admin']);
 $meuNome = $currentUser['nome'] ?? '';
 
+try {
 switch ($action) {
 
     case 'list': {
@@ -686,4 +687,7 @@ switch ($action) {
 
     default:
         fail(400, 'Ação desconhecida: ' . $action);
+}
+} catch (Throwable $e) {
+    fail(500, 'Erro interno: ' . $e->getMessage() . ' em ' . basename($e->getFile()) . ':' . $e->getLine());
 }
