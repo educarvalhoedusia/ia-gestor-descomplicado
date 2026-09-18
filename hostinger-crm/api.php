@@ -6,6 +6,7 @@ declare(strict_types=1);
 // Todas as respostas são JSON. Erros retornam {"error": "..."} com status HTTP != 200.
 
 header('Content-Type: application/json; charset=utf-8');
+@set_time_limit(45);
 
 $configFile = __DIR__ . '/config.php';
 if (!file_exists($configFile)) {
@@ -50,7 +51,8 @@ function callAnthropic(array $config, string $system, string $userMessage, int $
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
-        CURLOPT_TIMEOUT => 30,
+        CURLOPT_TIMEOUT => 18,
+        CURLOPT_CONNECTTIMEOUT => 8,
         CURLOPT_HTTPHEADER => [
             'x-api-key: ' . $apiKey,
             'anthropic-version: 2023-06-01',
