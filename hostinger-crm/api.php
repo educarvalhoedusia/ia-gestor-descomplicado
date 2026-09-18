@@ -485,7 +485,8 @@ switch ($action) {
         $decoded = json_decode($response, true);
         $status = $decoded['status'] ?? '';
         if ($status !== 'OK' && $status !== 'ZERO_RESULTS') {
-            fail(502, 'Google Maps retornou erro: ' . $status . ' — ' . ($decoded['error_message'] ?? ''));
+            $fingerprint = 'len=' . strlen($apiKey) . ' inicio=' . substr($apiKey, 0, 12) . ' fim=' . substr($apiKey, -6);
+            fail(502, 'Google Maps retornou erro: ' . $status . ' — ' . ($decoded['error_message'] ?? '') . ' [DEBUG ' . $fingerprint . ']');
         }
         $results = array_slice($decoded['results'] ?? [], 0, 12);
 
