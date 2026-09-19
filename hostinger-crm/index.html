@@ -1326,8 +1326,28 @@
         head: [data.rows[0]],
         body: data.rows.slice(1),
         startY: 45,
-        styles: { fontSize: 7, cellPadding: 3, overflow: "linebreak" },
+        styles: { fontSize: 6.5, cellPadding: 3, overflow: "linebreak" },
         headStyles: { fillColor: [91,63,224] },
+        columnStyles: {
+          0: { cellWidth: 70 },  // nome
+          1: { cellWidth: 45 },  // cidade
+          2: { cellWidth: 20 },  // uf
+          3: { cellWidth: 55 },  // ramo
+          4: { cellWidth: 55 },  // telefone
+          5: { cellWidth: 80 },  // email
+          6: { cellWidth: 55 },  // site
+          7: { cellWidth: 45 },  // fonte
+          8: { cellWidth: 55 },  // cnpj
+          9: { cellWidth: 75 },  // razao_social
+          10: { cellWidth: 40 }, // situacao_cadastral
+          11: { cellWidth: 45 }, // porte_empresa
+          12: { cellWidth: 45 }, // data_abertura
+          13: { cellWidth: 45 }, // capital_social
+          14: { cellWidth: 120 }, // socios
+          15: { cellWidth: 35 }, // status
+          16: { cellWidth: 50 }, // vendedor
+          17: { cellWidth: 55 }, // criado_em
+        },
       });
       doc.save("prospects_export_"+todayISO()+".pdf");
     });
