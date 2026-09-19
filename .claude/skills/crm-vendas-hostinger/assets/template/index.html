@@ -1424,6 +1424,7 @@
     html += '<div class="kv-grid">' +
       kv("Endereço", esc(p.endereco||"—")) +
       kv("Telefone", esc(p.telefone||"—")) +
+      kv("E-mail", esc(p.email||"—")) +
       kv("Site", p.site ? '<a href="'+esc(p.site)+'" target="_blank" rel="noopener">'+esc(p.site)+'</a>' : "—") +
       kv("Avaliação Google", p.rating!=null ? ('⭐ '+p.rating) : "—") +
       kv("Vendedor responsável", esc(p.vendedor||"—")) +

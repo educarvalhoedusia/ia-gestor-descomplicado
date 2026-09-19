@@ -39,6 +39,16 @@ function httpGetSimple(string $url, int $timeoutSeconds) {
     return @file_get_contents($url, false, $context);
 }
 
+function httpGetSimpleAuth(string $url, array $headers, int $timeoutSeconds) {
+    $context = stream_context_create(['http' => [
+        'method' => 'GET',
+        'header' => implode("\r\n", $headers) . "\r\n",
+        'timeout' => $timeoutSeconds,
+        'ignore_errors' => true,
+    ]]);
+    return @file_get_contents($url, false, $context);
+}
+
 function httpPostJson(string $url, array $headers, array $body, int $timeoutSeconds) {
     $context = stream_context_create(['http' => [
         'method' => 'POST',
@@ -160,6 +170,19 @@ function casaDosDadosBusca(array $config, array $body): array {
     return $decoded;
 }
 
+function casaDosDadosDetalhe(array $config, string $cnpj) {
+    $token = $config['casa_dos_dados_token'] ?? '';
+    if (!$token) return null;
+    $response = httpGetSimpleAuth(
+        'https://api.casadosdados.com.br/v4/cnpj/' . urlencode($cnpj),
+        ['api-key: ' . $token],
+        15
+    );
+    if ($response === false) return null;
+    $decoded = json_decode($response, true);
+    return (is_array($decoded) && isset($decoded['cnpj'])) ? $decoded : null;
+}
+
 function socioNomes(array $cnpjData): string {
     $nomes = [];
     foreach (($cnpjData['quadro_societario'] ?? []) as $s) {
@@ -179,6 +202,20 @@ function enderecoCompleto(array $cnpjData): string {
         $e['cep'] ?? '',
     ]);
     return implode(', ', $partes);
+}
+
+function situacaoAtual(array $cnpjData): string {
+    return $cnpjData['situacao_cadastral']['situacao_atual'] ?? '';
+}
+
+function telefonePrincipal(array $cnpjData): string {
+    $t = ($cnpjData['contato_telefonico'] ?? [])[0] ?? null;
+    if (!$t) return '';
+    return $t['completo'] ?? trim(($t['ddd'] ?? '') . ' ' . ($t['numero'] ?? ''));
+}
+
+function emailPrincipal(array $cnpjData): string {
+    return ($cnpjData['contato_email'] ?? [])[0]['email'] ?? '';
 }
 
 function reqStr($v, string $field, bool $required = true): string {
@@ -627,7 +664,6 @@ switch ($action) {
             'municipio' => [$cidade],
             'uf' => [$uf],
             'situacao_cadastral' => ['ATIVA'],
-            'tipo_resultado' => 'completo',
             'limite' => 12,
         ];
         if ($cnae) {
@@ -657,15 +693,22 @@ switch ($action) {
             $row = $exists->fetch();
 
             if (!$row) {
+                // Busca dados completos (endereço, sócios, telefone, e-mail) só para os
+                // primeiros novos, para não estourar o tempo de execução do servidor.
+                $det = $novos < 5 ? casaDosDadosDetalhe($config, $cnpj) : null;
+                $full = $det ?: $r;
+
                 $id = uid();
                 $createdAt = date('Y-m-d H:i:s');
-                $nome = $r['nome_fantasia'] ?: $r['razao_social'] ?? '(sem nome)';
-                $enderecoUf = $r['endereco']['uf'] ?? $uf;
-                $enderecoCidade = $r['endereco']['municipio'] ?? $cidade;
-                $socios = socioNomes($r);
-                $endereco = enderecoCompleto($r);
-                $porte = $r['porte_empresa']['descricao'] ?? '';
-                $situacao = $r['situacao_cadastral']['situacao_cadastral'] ?? '';
+                $nome = $full['nome_fantasia'] ?: $full['razao_social'] ?? '(sem nome)';
+                $enderecoUf = $full['endereco']['uf'] ?? $uf;
+                $enderecoCidade = $full['endereco']['municipio'] ?? $cidade;
+                $socios = $det ? socioNomes($det) : '';
+                $endereco = $det ? enderecoCompleto($det) : '';
+                $porte = $full['porte_empresa']['descricao'] ?? '';
+                $situacao = situacaoAtual($full);
+                $telefone = $det ? telefonePrincipal($det) : '';
+                $email = $det ? emailPrincipal($det) : '';
 
                 $pdo->prepare('
                     INSERT INTO prospects (
@@ -674,17 +717,17 @@ switch ($action) {
                         vendedor, status, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ')->execute([
-                    $id, $placeId, $nome, $endereco, $enderecoCidade, $enderecoUf, $ramo, '', '', '', null,
-                    'casa_dos_dados', $cnpj, $r['razao_social'] ?? '', $r['data_abertura'] ?? null,
-                    $r['capital_social'] ?? null, $situacao, $porte, $socios, $meuNome, 'novo', $createdAt,
+                    $id, $placeId, $nome, $endereco, $enderecoCidade, $enderecoUf, $ramo, $telefone, $email, '', null,
+                    'casa_dos_dados', $cnpj, $full['razao_social'] ?? '', $det['data_abertura'] ?? null,
+                    $det['capital_social'] ?? null, $situacao, $porte, $socios, $meuNome, 'novo', $createdAt,
                 ]);
                 $novos++;
                 $row = [
                     'id' => $id, 'nome' => $nome, 'endereco' => $endereco, 'cidade' => $enderecoCidade,
-                    'uf' => $enderecoUf, 'ramo' => $ramo, 'telefone' => '', 'email' => '', 'site' => '',
+                    'uf' => $enderecoUf, 'ramo' => $ramo, 'telefone' => $telefone, 'email' => $email, 'site' => '',
                     'rating' => null, 'fonte' => 'casa_dos_dados', 'cnpj' => $cnpj,
-                    'razao_social' => $r['razao_social'] ?? '', 'data_abertura' => $r['data_abertura'] ?? null,
-                    'capital_social' => $r['capital_social'] ?? null, 'situacao_cadastral' => $situacao,
+                    'razao_social' => $full['razao_social'] ?? '', 'data_abertura' => $det['data_abertura'] ?? null,
+                    'capital_social' => $det['capital_social'] ?? null, 'situacao_cadastral' => $situacao,
                     'porte_empresa' => $porte, 'socios' => $socios, 'vendedor' => $meuNome, 'status' => 'novo',
                     'resposta' => null, 'mensagem_sugerida' => null, 'contact_id' => null, 'created_at' => $createdAt,
                 ];
@@ -718,32 +761,41 @@ switch ($action) {
                 'tipo_busca' => 'radical',
             ]],
             'municipio' => $municipio,
-            'tipo_resultado' => 'completo',
             'limite' => 1,
         ];
         if ($ufFiltro) $body['uf'] = [$ufFiltro];
 
         $data = casaDosDadosBusca($config, $body);
-        $r = ($data['cnpjs'] ?? [])[0] ?? null;
-        if (!$r) {
+        $achado = ($data['cnpjs'] ?? [])[0] ?? null;
+        if (!$achado || empty($achado['cnpj'])) {
             echo json_encode(['ok' => false, 'motivo' => 'Nenhuma empresa correspondente encontrada na Casa dos Dados.']);
             break;
         }
 
-        $socios = socioNomes($r);
-        $endereco = enderecoCompleto($r);
-        $porte = $r['porte_empresa']['descricao'] ?? '';
-        $situacao = $r['situacao_cadastral']['situacao_cadastral'] ?? '';
-        $ufResp = $r['endereco']['uf'] ?? $ufFiltro;
+        $det = casaDosDadosDetalhe($config, $achado['cnpj']);
+        if (!$det) {
+            echo json_encode(['ok' => false, 'motivo' => 'Empresa encontrada, mas não foi possível obter os dados completos.']);
+            break;
+        }
+
+        $socios = socioNomes($det);
+        $endereco = enderecoCompleto($det);
+        $porte = $det['porte_empresa']['descricao'] ?? '';
+        $situacao = situacaoAtual($det);
+        $ufResp = $det['endereco']['uf'] ?? $ufFiltro;
+        $telefone = telefonePrincipal($det);
+        $email = emailPrincipal($det);
 
         $pdo->prepare('
             UPDATE prospects SET
                 cnpj = ?, razao_social = ?, data_abertura = ?, capital_social = ?, situacao_cadastral = ?,
-                porte_empresa = ?, socios = ?, endereco = ?, uf = ?
+                porte_empresa = ?, socios = ?, endereco = ?, uf = ?,
+                telefone = CASE WHEN telefone = \'\' THEN ? ELSE telefone END,
+                email = CASE WHEN email = \'\' THEN ? ELSE email END
             WHERE id = ?
         ')->execute([
-            $r['cnpj'] ?? '', $r['razao_social'] ?? '', $r['data_abertura'] ?? null, $r['capital_social'] ?? null,
-            $situacao, $porte, $socios, $endereco, $ufResp, $id,
+            $det['cnpj'] ?? '', $det['razao_social'] ?? '', $det['data_abertura'] ?? null, $det['capital_social'] ?? null,
+            $situacao, $porte, $socios, $endereco, $ufResp, $telefone, $email, $id,
         ]);
 
         $stmt = $pdo->prepare('SELECT * FROM prospects WHERE id = ?');
