@@ -41,6 +41,7 @@ function httpGetSimple(string $url, int $timeoutSeconds) {
 
 if (($_GET['action'] ?? '') === 'ping_debug') {
     header('Content-Type: text/plain; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
     echo "PASSO 1: PHP esta rodando. Hora do servidor: " . date('Y-m-d H:i:s') . "\n";
     @ob_flush(); @flush();
 
