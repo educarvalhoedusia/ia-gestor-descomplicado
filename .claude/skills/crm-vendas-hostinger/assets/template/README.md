@@ -208,36 +208,61 @@ preenchida.
 
 ---
 
-## Prospectar Clientes (busca no Google Maps + IA)
+## Prospectar Clientes (Google Maps + Casa dos Dados + IA)
 
 A aba **"🧭 Prospectar Clientes"**, no topo do painel, ajuda o vendedor a
-encontrar empresas em potencial numa cidade: informa a **cidade** e o
-**ramo de atuação** (ex.: "clínica odontológica", "imobiliária") e a IA
-busca no Google Maps. Cada empresa vira um **prospect** numa lista
-separada — não entra direto como lead, para o vendedor revisar antes.
+encontrar empresas em potencial numa cidade. Tem duas fontes de busca,
+que podem ser usadas juntas:
+
+- **🔍 Buscar no Google Maps**: informa **cidade** e **ramo de atuação**
+  (ex.: "clínica odontológica", "imobiliária") e a IA busca no Google
+  Maps — traz endereço, telefone, site e nota.
+- **📇 Buscar por CNPJ** (Casa dos Dados): informa **cidade**, **UF** e
+  **ramo** e busca direto na base de CNPJs ativos — traz razão social,
+  situação cadastral, porte, data de abertura, capital social e sócios
+  (não traz e-mail/telefone).
+
+Cada empresa vira um **prospect** numa lista separada — não entra direto
+como lead, para o vendedor revisar antes.
 
 > ⚠️ O Google Maps não usa código CNAE — a busca funciona por
-> palavra-chave/ramo de negócio.
+> palavra-chave/ramo de negócio. A busca por CNPJ pesquisa o texto
+> informado dentro da razão social/nome fantasia das empresas.
 
-Para cada prospect dá para: ver endereço/telefone/site/nota, **gerar
-mensagem de abordagem com IA** (e-mail ou WhatsApp), **abrir no
-WhatsApp/e-mail** já com a mensagem pronta, **registrar a resposta**
-recebida e, quando valer a pena, **"✅ Adicionar como lead"** para virar
-contato de verdade no CRM.
+Para cada prospect dá para: ver endereço/telefone/site/nota, **"🔎 Buscar
+dados completos (CNPJ)"** (completa com dados da Casa dos Dados um
+prospect achado pelo Google Maps), **gerar mensagem de abordagem com IA**
+(e-mail ou WhatsApp), **abrir no WhatsApp/e-mail** já com a mensagem
+pronta, **registrar a resposta** recebida e, quando valer a pena,
+**"✅ Adicionar como lead"** para virar contato de verdade no CRM.
 
-### Ativando
+### Ativando o Google Maps
 
 1. No Google Cloud Console, ative a **"Places API"** e configure
    faturamento (tem cota gratuita mensal).
 2. Crie uma **API Key** em "APIs e Serviços" → "Credenciais".
 3. Em `config.php`: `'google_maps_code' => 'SUA_CHAVE_AQUI',`
-4. Rode no phpMyAdmin a migração que cria a tabela `prospects` (veja
-   `schema.sql` do projeto — a tabela já vem criada em instalações novas).
-5. Suba o `index.html` e o `api.php` atualizados.
 
-Se `google_maps_code` ficar em branco, a busca mostra um erro claro ao
-clicar — o resto do painel continua funcionando. A geração de mensagem
-reaproveita a mesma `anthropic_api_key` do assistente de resposta.
+### Ativando a Casa dos Dados
+
+1. Crie uma conta em **portal.casadosdados.com.br** e contrate um plano
+   de API.
+2. Gere o token em **"Chave da API"** no painel da conta.
+3. Em `config.php`: `'casa_dos_dados_token' => 'SEU_TOKEN_AQUI',`
+
+### Migração do banco
+
+Rode no phpMyAdmin a migração que cria a tabela `prospects` (veja
+`schema.sql` do projeto — a tabela já vem criada completa em instalações
+novas; para instalações que já tinham só a busca por Google Maps, use o
+`ALTER TABLE` comentado logo depois em `schema.sql`).
+
+Suba o `index.html` e o `api.php` atualizados.
+
+Deixar `google_maps_code` ou `casa_dos_dados_token` em branco desativa só
+aquela fonte de busca (mostra um erro claro ao clicar) — o resto do
+painel continua funcionando. A geração de mensagem reaproveita a mesma
+`anthropic_api_key` do assistente de resposta.
 
 ---
 

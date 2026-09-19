@@ -81,11 +81,20 @@ CREATE TABLE IF NOT EXISTS prospects (
   nome VARCHAR(255) NOT NULL,
   endereco VARCHAR(500) DEFAULT '',
   cidade VARCHAR(120) DEFAULT '',
+  uf VARCHAR(2) DEFAULT '',
   ramo VARCHAR(255) DEFAULT '',
   telefone VARCHAR(60) DEFAULT '',
   email VARCHAR(255) DEFAULT '',
   site VARCHAR(255) DEFAULT '',
   rating DECIMAL(2,1) DEFAULT NULL,
+  fonte VARCHAR(30) NOT NULL DEFAULT 'google_maps',
+  cnpj VARCHAR(20) DEFAULT '',
+  razao_social VARCHAR(255) DEFAULT '',
+  data_abertura DATE NULL,
+  capital_social DECIMAL(14,2) NULL,
+  situacao_cadastral VARCHAR(30) DEFAULT '',
+  porte_empresa VARCHAR(120) DEFAULT '',
+  socios TEXT,
   vendedor VARCHAR(120) NOT NULL,
   status VARCHAR(30) NOT NULL DEFAULT 'novo',
   resposta TEXT,
@@ -95,3 +104,15 @@ CREATE TABLE IF NOT EXISTS prospects (
   INDEX idx_prospects_vendedor (vendedor),
   INDEX idx_prospects_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Migração para bancos que já tinham a tabela prospects antes destes campos:
+-- ALTER TABLE prospects
+--   ADD COLUMN uf VARCHAR(2) DEFAULT '',
+--   ADD COLUMN fonte VARCHAR(30) NOT NULL DEFAULT 'google_maps',
+--   ADD COLUMN cnpj VARCHAR(20) DEFAULT '',
+--   ADD COLUMN razao_social VARCHAR(255) DEFAULT '',
+--   ADD COLUMN data_abertura DATE NULL,
+--   ADD COLUMN capital_social DECIMAL(14,2) NULL,
+--   ADD COLUMN situacao_cadastral VARCHAR(30) DEFAULT '',
+--   ADD COLUMN porte_empresa VARCHAR(120) DEFAULT '',
+--   ADD COLUMN socios TEXT;

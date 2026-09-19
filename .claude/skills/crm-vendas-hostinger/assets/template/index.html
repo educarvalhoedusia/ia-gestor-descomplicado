@@ -295,9 +295,19 @@
     </div>
 
     <div class="prospect-search-bar">
-      <input type="text" id="pCidade" placeholder="Cidade (ex.: Campinas, SP)">
+      <input type="text" id="pCidade" placeholder="Cidade (ex.: Campinas)">
+      <select id="pUf">
+        <option value="">UF</option>
+        <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option>
+        <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
+        <option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option>
+        <option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+        <option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option>
+        <option>SE</option><option>TO</option>
+      </select>
       <input type="text" id="pRamo" placeholder="Ramo de atuação (ex.: clínica odontológica)">
-      <button class="btn btn-primary" id="btnBuscarProspects">🔍 Buscar empresas com IA</button>
+      <button class="btn btn-primary" id="btnBuscarProspects">🔍 Buscar no Google Maps</button>
+      <button class="btn btn-ghost" id="btnBuscarProspectsCnpj" title="Busca por CNPJ (razão social / nome fantasia), precisa da UF">📇 Buscar por CNPJ</button>
     </div>
 
     <div class="toolbar">
@@ -460,7 +470,7 @@
    "rankingModalBackdrop","rankingList","btnFecharRanking","accessModalBackdrop","accessList","btnFecharAccess",
    "modalTitle","btnSubmitContato",
    "tabContatos","tabProspectar","viewContatos","viewProspectar",
-   "pCidade","pRamo","btnBuscarProspects","pfStatus","prospectListBody","prospectListCount","prospectDetailPanel"
+   "pCidade","pUf","pRamo","btnBuscarProspects","btnBuscarProspectsCnpj","pfStatus","prospectListBody","prospectListCount","prospectDetailPanel"
   ].forEach(function(id){ els[id]=document.getElementById(id); });
 
   var state = { contacts: [], sellers: [], selectedId: null, ready:false, token:"", meuNome:"", isAdmin:false, editingContactId:null, onlyLate:false,
@@ -1286,6 +1296,7 @@
     els.tabProspectar.addEventListener("click", function(){ switchView("prospectar"); });
 
     els.btnBuscarProspects.addEventListener("click", buscarProspects);
+    els.btnBuscarProspectsCnpj.addEventListener("click", buscarProspectsCnpj);
     els.pfStatus.addEventListener("change", renderProspectList);
   }
 
@@ -1329,6 +1340,27 @@
     }catch(e){
       console.error(e);
       toast(e.message || "Não foi possível buscar no Google Maps.");
+    }finally{
+      btn.disabled = false; btn.textContent = textoOriginal;
+    }
+  }
+
+  async function buscarProspectsCnpj(){
+    var cidade = els.pCidade.value.trim();
+    var uf = els.pUf.value.trim();
+    var ramo = els.pRamo.value.trim();
+    if(!cidade || !uf || !ramo){ toast("Preencha cidade, UF e ramo de atuação para buscar por CNPJ."); return; }
+    var btn = els.btnBuscarProspectsCnpj;
+    var textoOriginal = btn.textContent;
+    btn.disabled = true; btn.textContent = "Buscando...";
+    try{
+      var r = await api("prospect_search_cnpj", {body:{cidade:cidade, uf:uf, ramo:ramo}});
+      state.prospectsLoaded = true;
+      toast(r.novos + " empresa(s) nova(s) encontrada(s) de " + r.total + " resultado(s).");
+      await loadProspects();
+    }catch(e){
+      console.error(e);
+      toast(e.message || "Não foi possível buscar na Casa dos Dados.");
     }finally{
       btn.disabled = false; btn.textContent = textoOriginal;
     }
@@ -1382,7 +1414,7 @@
 
     var html = '';
     html += '<div class="detail-head"><div><h2>'+esc(p.nome)+'</h2>' +
-      '<div class="detail-sub">'+esc(p.cidade||"—")+(p.ramo?" · "+esc(p.ramo):"")+'</div></div>' +
+      '<div class="detail-sub">'+esc(p.cidade||"—")+(p.uf?"/"+esc(p.uf):"")+(p.ramo?" · "+esc(p.ramo):"")+'</div></div>' +
       '<div style="display:flex;gap:.5em;">' +
       '<button class="btn btn-ghost btn-sm" id="btnDeleteProspect">Remover</button>' +
       '</div></div>';
@@ -1395,6 +1427,23 @@
       kv("Vendedor responsável", esc(p.vendedor||"—")) +
       kv("Status", '<span class="badge '+st.cls+'">'+st.label+'</span>') +
     '</div>';
+
+    html += '<div class="section-title">📇 Dados de CNPJ (Casa dos Dados)</div>';
+    if(p.cnpj){
+      html += '<div class="kv-grid">' +
+        kv("CNPJ", esc(p.cnpj)) +
+        kv("Razão social", esc(p.razaoSocial||"—")) +
+        kv("Situação cadastral", esc(p.situacaoCadastral||"—")) +
+        kv("Porte", esc(p.porteEmpresa||"—")) +
+        kv("Data de abertura", esc(p.dataAbertura||"—")) +
+        kv("Capital social", p.capitalSocial!=null ? ("R$ "+p.capitalSocial.toLocaleString("pt-BR")) : "—") +
+        kv("Sócios", esc(p.socios||"—")) +
+      '</div>';
+    } else {
+      html += '<div class="form-actions" style="justify-content:flex-start;">' +
+        '<button type="button" class="btn btn-ghost btn-sm" id="btnEnriquecerCnpj">🔎 Buscar dados completos (CNPJ)</button>' +
+      '</div>';
+    }
 
     if(p.contactId){
       html += '<div class="banner" style="margin-top:.8em;"><span>✅</span><div>Este prospect já virou lead no CRM.</div></div>';
@@ -1439,6 +1488,28 @@
     }
 
     els.prospectDetailPanel.innerHTML = html;
+
+    var btnEnriquecer = document.getElementById("btnEnriquecerCnpj");
+    if(btnEnriquecer){
+      btnEnriquecer.addEventListener("click", async function(){
+        var textoOriginal = btnEnriquecer.textContent;
+        btnEnriquecer.disabled = true; btnEnriquecer.textContent = "Buscando...";
+        try{
+          var r = await api("prospect_enrich_cnpj", {body:{id:p.id}});
+          if(r.ok){
+            toast("Dados de CNPJ encontrados.");
+            await loadProspects();
+          } else {
+            toast(r.motivo || "Nenhuma empresa correspondente encontrada.");
+          }
+        }catch(e){
+          console.error(e);
+          toast(e.message || "Não foi possível buscar na Casa dos Dados.");
+        }finally{
+          btnEnriquecer.disabled = false; btnEnriquecer.textContent = textoOriginal;
+        }
+      });
+    }
 
     document.getElementById("btnDeleteProspect").addEventListener("click", async function(){
       if(!confirm('Remover "'+p.nome+'" da lista de prospects?')) return;

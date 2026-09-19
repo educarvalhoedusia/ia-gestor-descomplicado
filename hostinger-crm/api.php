@@ -39,31 +39,15 @@ function httpGetSimple(string $url, int $timeoutSeconds) {
     return @file_get_contents($url, false, $context);
 }
 
-if (($_GET['action'] ?? '') === 'ping_debug') {
-    header('Content-Type: text/plain; charset=utf-8');
-    header('Cache-Control: no-store, no-cache, must-revalidate');
-    echo "PASSO 1: PHP esta rodando. Hora do servidor: " . date('Y-m-d H:i:s') . "\n";
-    @ob_flush(); @flush();
-
-    $mapsKey = $config['google_maps_code'] ?? '';
-    echo "PASSO 2: chave do Maps lida do config.php. Tamanho=" . strlen($mapsKey) . " inicio=" . substr($mapsKey, 0, 12) . "\n";
-    @ob_flush(); @flush();
-
-    echo "PASSO 3: testando conexao HTTPS com api.anthropic.com...\n";
-    @ob_flush(); @flush();
-    $t1 = microtime(true);
-    $r1 = httpGetSimple('https://api.anthropic.com', 8);
-    echo "PASSO 3 RESULTADO: " . ($r1 === false ? 'FALHOU' : 'OK') . " em " . round((microtime(true) - $t1) * 1000) . "ms\n";
-    @ob_flush(); @flush();
-
-    echo "PASSO 4: testando conexao HTTPS com maps.googleapis.com...\n";
-    @ob_flush(); @flush();
-    $t2 = microtime(true);
-    $testUrl = 'https://maps.googleapis.com/maps/api/geocode/json?address=Brasil&key=' . urlencode($mapsKey);
-    $r2 = httpGetSimple($testUrl, 8);
-    echo "PASSO 4 RESULTADO: " . ($r2 === false ? 'FALHOU' : substr($r2, 0, 300)) . " em " . round((microtime(true) - $t2) * 1000) . "ms\n";
-    echo "FIM DO TESTE.\n";
-    exit;
+function httpPostJson(string $url, array $headers, array $body, int $timeoutSeconds) {
+    $context = stream_context_create(['http' => [
+        'method' => 'POST',
+        'header' => implode("\r\n", $headers) . "\r\n",
+        'content' => json_encode($body),
+        'timeout' => $timeoutSeconds,
+        'ignore_errors' => true,
+    ]]);
+    return @file_get_contents($url, false, $context);
 }
 
 try {
@@ -120,8 +104,7 @@ function callAnthropic(array $config, string $system, string $userMessage, int $
     $decoded = json_decode($response, true);
     if ($httpCode !== 200 || !isset($decoded['content'][0]['text'])) {
         $errMsg = $decoded['error']['message'] ?? ('HTTP ' . $httpCode);
-        $fingerprint = 'len=' . strlen($apiKey) . ' inicio=' . substr($apiKey, 0, 16) . ' fim=' . substr($apiKey, -8);
-        fail(502, 'Falha ao gerar texto com IA: ' . $errMsg . ' [DEBUG ' . $fingerprint . ']');
+        fail(502, 'Falha ao gerar texto com IA: ' . $errMsg);
     }
     return trim($decoded['content'][0]['text']);
 }
@@ -132,11 +115,20 @@ function mapProspectRow(array $r): array {
         'nome' => $r['nome'],
         'endereco' => $r['endereco'],
         'cidade' => $r['cidade'],
+        'uf' => $r['uf'] ?? '',
         'ramo' => $r['ramo'],
         'telefone' => $r['telefone'],
         'email' => $r['email'],
         'site' => $r['site'],
         'rating' => $r['rating'] !== null ? (float)$r['rating'] : null,
+        'fonte' => $r['fonte'] ?? 'google_maps',
+        'cnpj' => $r['cnpj'] ?? '',
+        'razaoSocial' => $r['razao_social'] ?? '',
+        'dataAbertura' => $r['data_abertura'] ?? null,
+        'capitalSocial' => isset($r['capital_social']) && $r['capital_social'] !== null ? (float)$r['capital_social'] : null,
+        'situacaoCadastral' => $r['situacao_cadastral'] ?? '',
+        'porteEmpresa' => $r['porte_empresa'] ?? '',
+        'socios' => $r['socios'] ?? '',
         'vendedor' => $r['vendedor'],
         'status' => $r['status'],
         'resposta' => $r['resposta'],
@@ -144,6 +136,49 @@ function mapProspectRow(array $r): array {
         'contactId' => $r['contact_id'],
         'createdAt' => str_replace(' ', 'T', $r['created_at']),
     ];
+}
+
+function casaDosDadosBusca(array $config, array $body): array {
+    $token = $config['casa_dos_dados_token'] ?? '';
+    if (!$token) {
+        fail(500, 'Token da Casa dos Dados não configurado. Adicione "casa_dos_dados_token" no config.php.');
+    }
+    $response = httpPostJson(
+        'https://api.casadosdados.com.br/v5/cnpj/pesquisa',
+        ['api-key: ' . $token, 'Content-Type: application/json'],
+        $body,
+        15
+    );
+    if ($response === false) {
+        fail(502, 'Falha ao consultar a Casa dos Dados.');
+    }
+    $decoded = json_decode($response, true);
+    if (!is_array($decoded) || !isset($decoded['cnpjs'])) {
+        $msg = $decoded['message'] ?? $decoded['error'] ?? substr($response, 0, 200);
+        fail(502, 'Casa dos Dados retornou erro: ' . $msg);
+    }
+    return $decoded;
+}
+
+function socioNomes(array $cnpjData): string {
+    $nomes = [];
+    foreach (($cnpjData['quadro_societario'] ?? []) as $s) {
+        if (!empty($s['nome'])) $nomes[] = $s['nome'];
+    }
+    return implode(', ', array_slice($nomes, 0, 6));
+}
+
+function enderecoCompleto(array $cnpjData): string {
+    $e = $cnpjData['endereco'] ?? [];
+    $partes = array_filter([
+        trim(($e['tipo_logradouro'] ?? '') . ' ' . ($e['logradouro'] ?? '')),
+        $e['numero'] ?? '',
+        $e['bairro'] ?? '',
+        $e['municipio'] ?? '',
+        $e['uf'] ?? '',
+        $e['cep'] ?? '',
+    ]);
+    return implode(', ', $partes);
 }
 
 function reqStr($v, string $field, bool $required = true): string {
@@ -525,8 +560,7 @@ switch ($action) {
         $decoded = json_decode($response, true);
         $status = $decoded['status'] ?? '';
         if ($status !== 'OK' && $status !== 'ZERO_RESULTS') {
-            $fingerprint = 'len=' . strlen($apiKey) . ' inicio=' . substr($apiKey, 0, 12) . ' fim=' . substr($apiKey, -6);
-            fail(502, 'Google Maps retornou erro: ' . $status . ' — ' . ($decoded['error_message'] ?? '') . ' [DEBUG ' . $fingerprint . ']');
+            fail(502, 'Google Maps retornou erro: ' . $status . ' — ' . ($decoded['error_message'] ?? ''));
         }
         $results = array_slice($decoded['results'] ?? [], 0, 12);
 
@@ -577,6 +611,132 @@ switch ($action) {
         }
 
         echo json_encode(['novos' => $novos, 'total' => count($out), 'prospects' => array_map('mapProspectRow', $out)]);
+        break;
+    }
+
+    case 'prospect_search_cnpj': {
+        $cidade = reqStr($input['cidade'] ?? null, 'cidade');
+        $uf = strtoupper(reqStr($input['uf'] ?? null, 'uf'));
+        $ramo = reqStr($input['ramo'] ?? null, 'ramo');
+
+        $data = casaDosDadosBusca($config, [
+            'municipio' => [$cidade],
+            'uf' => [$uf],
+            'busca_textual' => [[
+                'texto' => [$ramo],
+                'razao_social' => true,
+                'nome_fantasia' => true,
+                'tipo_busca' => 'radical',
+            ]],
+            'situacao_cadastral' => ['ATIVA'],
+            'tipo_resultado' => 'completo',
+            'limite' => 12,
+        ]);
+
+        $novos = 0;
+        $out = [];
+        foreach (($data['cnpjs'] ?? []) as $r) {
+            $cnpj = $r['cnpj'] ?? null;
+            if (!$cnpj) continue;
+            $placeId = 'cd_' . $cnpj;
+
+            $exists = $pdo->prepare('SELECT * FROM prospects WHERE place_id = ?');
+            $exists->execute([$placeId]);
+            $row = $exists->fetch();
+
+            if (!$row) {
+                $id = uid();
+                $createdAt = date('Y-m-d H:i:s');
+                $nome = $r['nome_fantasia'] ?: $r['razao_social'] ?? '(sem nome)';
+                $enderecoUf = $r['endereco']['uf'] ?? $uf;
+                $enderecoCidade = $r['endereco']['municipio'] ?? $cidade;
+                $socios = socioNomes($r);
+                $endereco = enderecoCompleto($r);
+                $porte = $r['porte_empresa']['descricao'] ?? '';
+                $situacao = $r['situacao_cadastral']['situacao_cadastral'] ?? '';
+
+                $pdo->prepare('
+                    INSERT INTO prospects (
+                        id, place_id, nome, endereco, cidade, uf, ramo, telefone, email, site, rating, fonte,
+                        cnpj, razao_social, data_abertura, capital_social, situacao_cadastral, porte_empresa, socios,
+                        vendedor, status, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ')->execute([
+                    $id, $placeId, $nome, $endereco, $enderecoCidade, $enderecoUf, $ramo, '', '', '', null,
+                    'casa_dos_dados', $cnpj, $r['razao_social'] ?? '', $r['data_abertura'] ?? null,
+                    $r['capital_social'] ?? null, $situacao, $porte, $socios, $meuNome, 'novo', $createdAt,
+                ]);
+                $novos++;
+                $row = [
+                    'id' => $id, 'nome' => $nome, 'endereco' => $endereco, 'cidade' => $enderecoCidade,
+                    'uf' => $enderecoUf, 'ramo' => $ramo, 'telefone' => '', 'email' => '', 'site' => '',
+                    'rating' => null, 'fonte' => 'casa_dos_dados', 'cnpj' => $cnpj,
+                    'razao_social' => $r['razao_social'] ?? '', 'data_abertura' => $r['data_abertura'] ?? null,
+                    'capital_social' => $r['capital_social'] ?? null, 'situacao_cadastral' => $situacao,
+                    'porte_empresa' => $porte, 'socios' => $socios, 'vendedor' => $meuNome, 'status' => 'novo',
+                    'resposta' => null, 'mensagem_sugerida' => null, 'contact_id' => null, 'created_at' => $createdAt,
+                ];
+            }
+            $out[] = $row;
+        }
+
+        echo json_encode(['novos' => $novos, 'total' => count($out), 'prospects' => array_map('mapProspectRow', $out)]);
+        break;
+    }
+
+    case 'prospect_enrich_cnpj': {
+        $id = reqStr($input['id'] ?? null, 'id');
+
+        $stmt = $pdo->prepare('SELECT * FROM prospects WHERE id = ?');
+        $stmt->execute([$id]);
+        $p = $stmt->fetch();
+        if (!$p) fail(404, 'Prospect não encontrado.');
+        if (!$isAdmin && trim($p['vendedor']) !== trim($meuNome)) {
+            fail(403, 'Você só pode enriquecer os próprios prospects.');
+        }
+
+        $municipio = [$p['cidade']];
+        $ufFiltro = $p['uf'] ?? '';
+
+        $body = [
+            'busca_textual' => [[
+                'texto' => [$p['nome']],
+                'razao_social' => true,
+                'nome_fantasia' => true,
+                'tipo_busca' => 'radical',
+            ]],
+            'municipio' => $municipio,
+            'tipo_resultado' => 'completo',
+            'limite' => 1,
+        ];
+        if ($ufFiltro) $body['uf'] = [$ufFiltro];
+
+        $data = casaDosDadosBusca($config, $body);
+        $r = ($data['cnpjs'] ?? [])[0] ?? null;
+        if (!$r) {
+            echo json_encode(['ok' => false, 'motivo' => 'Nenhuma empresa correspondente encontrada na Casa dos Dados.']);
+            break;
+        }
+
+        $socios = socioNomes($r);
+        $endereco = enderecoCompleto($r);
+        $porte = $r['porte_empresa']['descricao'] ?? '';
+        $situacao = $r['situacao_cadastral']['situacao_cadastral'] ?? '';
+        $ufResp = $r['endereco']['uf'] ?? $ufFiltro;
+
+        $pdo->prepare('
+            UPDATE prospects SET
+                cnpj = ?, razao_social = ?, data_abertura = ?, capital_social = ?, situacao_cadastral = ?,
+                porte_empresa = ?, socios = ?, endereco = ?, uf = ?
+            WHERE id = ?
+        ')->execute([
+            $r['cnpj'] ?? '', $r['razao_social'] ?? '', $r['data_abertura'] ?? null, $r['capital_social'] ?? null,
+            $situacao, $porte, $socios, $endereco, $ufResp, $id,
+        ]);
+
+        $stmt = $pdo->prepare('SELECT * FROM prospects WHERE id = ?');
+        $stmt->execute([$id]);
+        echo json_encode(['ok' => true, 'prospect' => mapProspectRow($stmt->fetch())]);
         break;
     }
 

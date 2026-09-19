@@ -39,4 +39,10 @@ return [
     // gratuita mensal). Deixe em branco para desativar a aba sem quebrar o
     // resto do painel.
     'google_maps_code' => '',
+
+    // Usada pela aba "Prospectar Clientes" para buscar/enriquecer empresas
+    // por CNPJ (Casa dos Dados: portal.casadosdados.com.br). Gere o token em
+    // "Chave da API" no painel da sua conta. Deixe em branco para desativar
+    // essa fonte sem quebrar o resto do painel.
+    'casa_dos_dados_token' => '',
 ];

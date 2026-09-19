@@ -260,23 +260,35 @@ conversa em branco.
 
 ---
 
-## Prospectar Clientes (busca no Google Maps + IA)
+## Prospectar Clientes (Google Maps + Casa dos Dados + IA)
 
 A aba **"🧭 Prospectar Clientes"**, no topo do painel, ajuda o vendedor a
 encontrar empresas em potencial numa cidade, sem precisar já ter o
-contato: informa a **cidade** e o **ramo de atuação** (ex.: "clínica
-odontológica", "escritório de contabilidade", "imobiliária") e a IA busca
-no Google Maps. Cada empresa encontrada vira um **prospect** numa lista
-separada — não entra direto como lead no CRM, para o vendedor revisar
-antes.
+contato. Tem duas fontes de busca, que podem ser usadas juntas:
+
+- **🔍 Buscar no Google Maps**: informa **cidade** e **ramo de atuação**
+  (ex.: "clínica odontológica", "escritório de contabilidade") e a IA
+  busca no Google Maps — traz endereço, telefone, site e nota.
+- **📇 Buscar por CNPJ** (Casa dos Dados): informa **cidade**, **UF** e
+  **ramo** e busca direto na base de CNPJs ativos — traz razão social,
+  situação cadastral, porte, data de abertura, capital social e sócios
+  (não traz e-mail/telefone).
+
+Cada empresa encontrada vira um **prospect** numa lista separada — não
+entra direto como lead no CRM, para o vendedor revisar antes.
 
 > ⚠️ O Google Maps não usa código CNAE (isso é uma classificação da
 > Receita Federal) — a busca funciona por palavra-chave/ramo de negócio,
-> que na prática cobre o mesmo objetivo.
+> que na prática cobre o mesmo objetivo. Já a busca por CNPJ pesquisa o
+> texto informado dentro da razão social/nome fantasia das empresas.
 
 ### O que dá para fazer com cada prospect
 
-- Ver endereço, telefone, site e nota do Google.
+- Ver endereço, telefone, site e nota do Google (quando veio do Maps).
+- **"🔎 Buscar dados completos (CNPJ)"**: para prospects achados pelo
+  Google Maps, busca na Casa dos Dados pelo nome da empresa e completa o
+  CNPJ, razão social, situação cadastral, porte, data de abertura,
+  capital social e sócios.
 - **Gerar mensagem de abordagem com IA**, separada para **e-mail** ou
   **WhatsApp** — a IA já considera o ramo de atuação da empresa.
 - **Abrir no WhatsApp/e-mail** com a mensagem pronta (mesmo mecanismo do
@@ -287,7 +299,7 @@ antes.
   seguir, transforma o prospect em contato de verdade no CRM (pede o
   nome de quem respondeu, telefone e e-mail).
 
-### Ativando
+### Ativando a busca no Google Maps
 
 1. Crie um projeto no **Google Cloud Console** (console.cloud.google.com),
    ative a **"Places API"** e configure uma forma de pagamento (tem cota
@@ -298,36 +310,64 @@ antes.
    ```php
    'google_maps_code' => 'SUA_CHAVE_AQUI',
    ```
-4. Rode a migração SQL abaixo no phpMyAdmin (cria a tabela de prospects):
-   ```sql
-   CREATE TABLE IF NOT EXISTS prospects (
-     id VARCHAR(40) PRIMARY KEY,
-     place_id VARCHAR(120) NOT NULL UNIQUE,
-     nome VARCHAR(255) NOT NULL,
-     endereco VARCHAR(500) DEFAULT '',
-     cidade VARCHAR(120) DEFAULT '',
-     ramo VARCHAR(255) DEFAULT '',
-     telefone VARCHAR(60) DEFAULT '',
-     email VARCHAR(255) DEFAULT '',
-     site VARCHAR(255) DEFAULT '',
-     rating DECIMAL(2,1) DEFAULT NULL,
-     vendedor VARCHAR(120) NOT NULL,
-     status VARCHAR(30) NOT NULL DEFAULT 'novo',
-     resposta TEXT,
-     mensagem_sugerida TEXT,
-     contact_id VARCHAR(40) NULL,
-     created_at DATETIME NOT NULL,
-     INDEX idx_prospects_vendedor (vendedor),
-     INDEX idx_prospects_status (status)
-   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-   ```
-5. Suba o `index.html` e o `api.php` atualizados. Pronto — a aba já
-   aparece no topo do painel para todo mundo.
 
-Se `google_maps_code` ficar em branco, a busca mostra um erro claro ao
-clicar — o resto do painel continua funcionando sem problema. A geração
-de mensagem por IA reaproveita a mesma `anthropic_api_key` já configurada
-para o assistente de resposta.
+### Ativando a busca por CNPJ (Casa dos Dados)
+
+1. Crie uma conta em **portal.casadosdados.com.br** e contrate um plano
+   de API (cobrança por consulta).
+2. No painel da conta, vá em **"Chave da API"** e gere o token.
+3. Em `config.php`, adicione:
+   ```php
+   'casa_dos_dados_token' => 'SEU_TOKEN_AQUI',
+   ```
+
+### Migração do banco (uma única vez)
+
+Rode a migração SQL abaixo no phpMyAdmin. Se a tabela `prospects` ainda
+não existe, cria ela já completa; se já existe (painel já tinha só a
+busca por Google Maps), use o `ALTER TABLE` comentado logo depois em
+`schema.sql`.
+
+```sql
+CREATE TABLE IF NOT EXISTS prospects (
+  id VARCHAR(40) PRIMARY KEY,
+  place_id VARCHAR(120) NOT NULL UNIQUE,
+  nome VARCHAR(255) NOT NULL,
+  endereco VARCHAR(500) DEFAULT '',
+  cidade VARCHAR(120) DEFAULT '',
+  uf VARCHAR(2) DEFAULT '',
+  ramo VARCHAR(255) DEFAULT '',
+  telefone VARCHAR(60) DEFAULT '',
+  email VARCHAR(255) DEFAULT '',
+  site VARCHAR(255) DEFAULT '',
+  rating DECIMAL(2,1) DEFAULT NULL,
+  fonte VARCHAR(30) NOT NULL DEFAULT 'google_maps',
+  cnpj VARCHAR(20) DEFAULT '',
+  razao_social VARCHAR(255) DEFAULT '',
+  data_abertura DATE NULL,
+  capital_social DECIMAL(14,2) NULL,
+  situacao_cadastral VARCHAR(30) DEFAULT '',
+  porte_empresa VARCHAR(120) DEFAULT '',
+  socios TEXT,
+  vendedor VARCHAR(120) NOT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'novo',
+  resposta TEXT,
+  mensagem_sugerida TEXT,
+  contact_id VARCHAR(40) NULL,
+  created_at DATETIME NOT NULL,
+  INDEX idx_prospects_vendedor (vendedor),
+  INDEX idx_prospects_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+Suba o `index.html` e o `api.php` atualizados. Pronto — a aba já aparece
+no topo do painel para todo mundo.
+
+Deixar `google_maps_code` ou `casa_dos_dados_token` em branco desativa só
+aquela fonte de busca (mostra um erro claro ao clicar) — o resto do
+painel continua funcionando sem problema. A geração de mensagem por IA
+reaproveita a mesma `anthropic_api_key` já configurada para o assistente
+de resposta.
 
 ---
 

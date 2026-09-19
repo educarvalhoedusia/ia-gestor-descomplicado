@@ -36,11 +36,14 @@ que recriar ~1500 linhas de HTML/JS/PHP a cada pedido.
   o vendedor cola a resposta do comprador e a IA sugere um texto persuasivo
   para convencê-lo a avançar — o vendedor sempre revisa antes de enviar, e
   pode abrir a sugestão direto no WhatsApp com um clique.
-- **Aba "Prospectar Clientes"** (opcional, requer API key do Google Maps):
-  busca empresas em potencial no Google Maps por cidade + ramo de atuação,
-  numa lista separada de "prospects" para o vendedor revisar; a IA gera
-  mensagem de abordagem para e-mail ou WhatsApp, e o vendedor pode
-  converter o prospect em lead de verdade no CRM com um clique.
+- **Aba "Prospectar Clientes"** (opcional): busca empresas em potencial
+  por cidade + ramo de atuação, no Google Maps (API key do Google) e/ou
+  por CNPJ na Casa dos Dados (razão social/nome fantasia, com dados como
+  situação cadastral, porte e sócios), numa lista separada de "prospects"
+  para o vendedor revisar; dá pra completar um prospect achado no Maps com
+  os dados de CNPJ da Casa dos Dados. A IA gera mensagem de abordagem para
+  e-mail ou WhatsApp, e o vendedor pode converter o prospect em lead de
+  verdade no CRM com um clique.
 - **Ajuda para identificar e dica de abordagem por perfil DISC** (sem custo,
   texto fixo): no cadastro, uma lista de frases típicas ("quero ver quem já
   usou e os resultados" → perfil C) ajuda a identificar o perfil do lead
