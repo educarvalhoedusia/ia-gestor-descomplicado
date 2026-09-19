@@ -750,29 +750,36 @@ switch ($action) {
             fail(403, 'Você só pode enriquecer os próprios prospects.');
         }
 
-        $municipio = [$p['cidade']];
         $ufFiltro = $p['uf'] ?? '';
+        $cnpjConhecido = $p['cnpj'] ?? '';
 
-        $body = [
-            'busca_textual' => [[
-                'texto' => [$p['nome']],
-                'razao_social' => true,
-                'nome_fantasia' => true,
-                'tipo_busca' => 'radical',
-            ]],
-            'municipio' => $municipio,
-            'limite' => 1,
-        ];
-        if ($ufFiltro) $body['uf'] = [$ufFiltro];
+        if ($cnpjConhecido) {
+            // Já sabemos o CNPJ (achado numa busca anterior sem detalhamento completo);
+            // não precisa buscar de novo, só completar os dados.
+            $cnpjAlvo = $cnpjConhecido;
+        } else {
+            $body = [
+                'busca_textual' => [[
+                    'texto' => [$p['nome']],
+                    'razao_social' => true,
+                    'nome_fantasia' => true,
+                    'tipo_busca' => 'radical',
+                ]],
+                'municipio' => [$p['cidade']],
+                'limite' => 1,
+            ];
+            if ($ufFiltro) $body['uf'] = [$ufFiltro];
 
-        $data = casaDosDadosBusca($config, $body);
-        $achado = ($data['cnpjs'] ?? [])[0] ?? null;
-        if (!$achado || empty($achado['cnpj'])) {
-            echo json_encode(['ok' => false, 'motivo' => 'Nenhuma empresa correspondente encontrada na Casa dos Dados.']);
-            break;
+            $data = casaDosDadosBusca($config, $body);
+            $achado = ($data['cnpjs'] ?? [])[0] ?? null;
+            if (!$achado || empty($achado['cnpj'])) {
+                echo json_encode(['ok' => false, 'motivo' => 'Nenhuma empresa correspondente encontrada na Casa dos Dados.']);
+                break;
+            }
+            $cnpjAlvo = $achado['cnpj'];
         }
 
-        $det = casaDosDadosDetalhe($config, $achado['cnpj']);
+        $det = casaDosDadosDetalhe($config, $cnpjAlvo);
         if (!$det) {
             echo json_encode(['ok' => false, 'motivo' => 'Empresa encontrada, mas não foi possível obter os dados completos.']);
             break;

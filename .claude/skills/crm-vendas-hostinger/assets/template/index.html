@@ -1442,9 +1442,10 @@
         kv("Capital social", p.capitalSocial!=null ? ("R$ "+p.capitalSocial.toLocaleString("pt-BR")) : "—") +
         kv("Sócios", esc(p.socios||"—")) +
       '</div>';
-    } else {
+    }
+    if(!p.socios){
       html += '<div class="form-actions" style="justify-content:flex-start;">' +
-        '<button type="button" class="btn btn-ghost btn-sm" id="btnEnriquecerCnpj">🔎 Buscar dados completos (CNPJ)</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" id="btnEnriquecerCnpj">🔎 '+(p.cnpj?"Completar dados do CNPJ":"Buscar dados completos (CNPJ)")+'</button>' +
       '</div>';
     }
 
