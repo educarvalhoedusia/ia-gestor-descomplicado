@@ -310,8 +310,9 @@
         <option>SE</option><option>TO</option>
       </select>
       <input type="text" id="pRamo" placeholder="Ramo de atuação (ex.: clínica odontológica)">
+      <input type="text" id="pCnae" placeholder="CNAE (opcional, ex.: 6920-6/01)" title="Se preenchido, a busca por CNPJ usa o código CNAE em vez do ramo digitado">
       <button class="btn btn-primary" id="btnBuscarProspects">🔍 Buscar no Google Maps</button>
-      <button class="btn btn-ghost" id="btnBuscarProspectsCnpj" title="Busca por CNPJ (razão social / nome fantasia), precisa da UF">📇 Buscar por CNPJ</button>
+      <button class="btn btn-ghost" id="btnBuscarProspectsCnpj" title="Busca por CNPJ: usa o código CNAE se preenchido, senão busca o ramo na razão social/nome fantasia. Precisa da UF.">📇 Buscar por CNPJ</button>
     </div>
 
     <div class="toolbar">
@@ -474,7 +475,7 @@
    "rankingModalBackdrop","rankingList","btnFecharRanking","accessModalBackdrop","accessList","btnFecharAccess",
    "modalTitle","btnSubmitContato",
    "tabContatos","tabProspectar","viewContatos","viewProspectar",
-   "pCidade","pUf","pRamo","btnBuscarProspects","btnBuscarProspectsCnpj","pfStatus","prospectListBody","prospectListCount","prospectDetailPanel"
+   "pCidade","pUf","pRamo","pCnae","btnBuscarProspects","btnBuscarProspectsCnpj","pfStatus","prospectListBody","prospectListCount","prospectDetailPanel"
   ].forEach(function(id){ els[id]=document.getElementById(id); });
 
   var state = { contacts: [], sellers: [], selectedId: null, ready:false, token:"", meuNome:"", isAdmin:false, editingContactId:null, onlyLate:false,
@@ -1353,12 +1354,13 @@
     var cidade = els.pCidade.value.trim();
     var uf = els.pUf.value.trim();
     var ramo = els.pRamo.value.trim();
-    if(!cidade || !uf || !ramo){ toast("Preencha cidade, UF e ramo de atuação para buscar por CNPJ."); return; }
+    var cnae = els.pCnae.value.trim();
+    if(!cidade || !uf || (!ramo && !cnae)){ toast("Preencha cidade, UF e (ramo de atuação ou CNAE) para buscar por CNPJ."); return; }
     var btn = els.btnBuscarProspectsCnpj;
     var textoOriginal = btn.textContent;
     btn.disabled = true; btn.textContent = "Buscando...";
     try{
-      var r = await api("prospect_search_cnpj", {body:{cidade:cidade, uf:uf, ramo:ramo}});
+      var r = await api("prospect_search_cnpj", {body:{cidade:cidade, uf:uf, ramo:ramo, cnae:cnae}});
       state.prospectsLoaded = true;
       toast(r.novos + " empresa(s) nova(s) encontrada(s) de " + r.total + " resultado(s).");
       await loadProspects();

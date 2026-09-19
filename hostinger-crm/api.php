@@ -617,21 +617,32 @@ switch ($action) {
     case 'prospect_search_cnpj': {
         $cidade = reqStr($input['cidade'] ?? null, 'cidade');
         $uf = strtoupper(reqStr($input['uf'] ?? null, 'uf'));
-        $ramo = reqStr($input['ramo'] ?? null, 'ramo');
+        $ramo = reqStr($input['ramo'] ?? null, 'ramo', false);
+        $cnaeInput = reqStr($input['cnae'] ?? null, 'cnae', false);
+        $cnae = preg_replace('/\D+/', '', $cnaeInput);
+        if (!$ramo && !$cnae) fail(422, 'Informe o ramo de atuação ou o código CNAE.');
 
-        $data = casaDosDadosBusca($config, [
+        $body = [
             'municipio' => [$cidade],
             'uf' => [$uf],
-            'busca_textual' => [[
+            'situacao_cadastral' => ['ATIVA'],
+            'tipo_resultado' => 'completo',
+            'limite' => 12,
+        ];
+        if ($cnae) {
+            // A API espera o CNAE sem pontuação (ex.: "6920601").
+            $body['codigo_atividade_principal'] = [$cnae];
+        } else {
+            $body['busca_textual'] = [[
                 'texto' => [$ramo],
                 'razao_social' => true,
                 'nome_fantasia' => true,
                 'tipo_busca' => 'radical',
-            ]],
-            'situacao_cadastral' => ['ATIVA'],
-            'tipo_resultado' => 'completo',
-            'limite' => 12,
-        ]);
+            ]];
+        }
+
+        $data = casaDosDadosBusca($config, $body);
+        $ramo = $ramo ?: ('CNAE ' . $cnaeInput);
 
         $novos = 0;
         $out = [];
