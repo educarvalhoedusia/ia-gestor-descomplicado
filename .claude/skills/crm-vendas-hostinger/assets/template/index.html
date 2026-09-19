@@ -321,6 +321,8 @@
         <option value="virou_lead">Virou lead</option>
       </select>
       <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnExportProspectsExcel">⭳ Excel</button>
+      <button class="btn btn-ghost btn-sm" id="btnExportProspectsPdf">⭳ PDF</button>
     </div>
 
     <div class="board">
@@ -471,7 +473,8 @@
    "rankingModalBackdrop","rankingList","btnFecharRanking","accessModalBackdrop","accessList","btnFecharAccess",
    "modalTitle","btnSubmitContato",
    "tabContatos","tabProspectar","viewContatos","viewProspectar",
-   "pCidade","pUf","pRamo","pCnae","btnBuscarProspects","btnBuscarProspectsCnpj","pfStatus","prospectListBody","prospectListCount","prospectDetailPanel"
+   "pCidade","pUf","pRamo","pCnae","btnBuscarProspects","btnBuscarProspectsCnpj","pfStatus","prospectListBody","prospectListCount","prospectDetailPanel",
+   "btnExportProspectsExcel","btnExportProspectsPdf"
   ].forEach(function(id){ els[id]=document.getElementById(id); });
 
   var state = { contacts: [], sellers: [], selectedId: null, ready:false, token:"", meuNome:"", isAdmin:false, editingContactId:null, onlyLate:false,
@@ -1299,6 +1302,31 @@
     els.btnBuscarProspects.addEventListener("click", buscarProspects);
     els.btnBuscarProspectsCnpj.addEventListener("click", buscarProspectsCnpj);
     els.pfStatus.addEventListener("change", renderProspectList);
+
+    els.btnExportProspectsExcel.addEventListener("click", function(){
+      if(typeof XLSX === "undefined"){ toast("Biblioteca de Excel não carregou. Verifique sua conexão e tente de novo."); return; }
+      var data = buildProspectExportRows();
+      var ws = XLSX.utils.aoa_to_sheet(data.rows);
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Prospects");
+      XLSX.writeFile(wb, "prospects_export_"+todayISO()+".xlsx");
+    });
+
+    els.btnExportProspectsPdf.addEventListener("click", function(){
+      if(typeof window.jspdf === "undefined"){ toast("Biblioteca de PDF não carregou. Verifique sua conexão e tente de novo."); return; }
+      var data = buildProspectExportRows();
+      var doc = new window.jspdf.jsPDF({orientation:"landscape", unit:"pt", format:"a3"});
+      doc.setFontSize(14);
+      doc.text("Prospectar Clientes — Exportação " + todayISO(), 30, 30);
+      doc.autoTable({
+        head: [data.rows[0]],
+        body: data.rows.slice(1),
+        startY: 45,
+        styles: { fontSize: 7, cellPadding: 3, overflow: "linebreak" },
+        headStyles: { fillColor: [91,63,224] },
+      });
+      doc.save("prospects_export_"+todayISO()+".pdf");
+    });
   }
 
   // ---------- Prospectar Clientes ----------
@@ -1379,6 +1407,24 @@
   function getFilteredProspects(){
     var st = els.pfStatus.value;
     return state.prospects.filter(function(p){ return !st || p.status===st; });
+  }
+
+  function buildProspectExportRows(){
+    var header = [
+      "nome","cidade","uf","ramo","telefone","email","site","fonte","cnpj","razao_social",
+      "situacao_cadastral","porte_empresa","data_abertura","capital_social","socios",
+      "status","vendedor","criado_em",
+    ];
+    var rows = [header];
+    getFilteredProspects().forEach(function(p){
+      rows.push([
+        p.nome||"", p.cidade||"", p.uf||"", p.ramo||"", p.telefone||"", p.email||"", p.site||"",
+        p.fonte||"", p.cnpj||"", p.razaoSocial||"", p.situacaoCadastral||"", p.porteEmpresa||"",
+        p.dataAbertura||"", p.capitalSocial!=null?p.capitalSocial:"", p.socios||"",
+        (PROSPECT_STATUS[p.status]||{}).label||p.status||"", p.vendedor||"", p.createdAt||"",
+      ]);
+    });
+    return {rows: rows};
   }
 
   function renderProspectList(){
