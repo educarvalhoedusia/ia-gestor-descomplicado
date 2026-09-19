@@ -30,6 +30,32 @@ function fail(int $status, string $msg): void {
     exit;
 }
 
+function httpGetSimple(string $url, int $timeoutSeconds) {
+    $context = stream_context_create(['http' => [
+        'method' => 'GET',
+        'timeout' => $timeoutSeconds,
+        'ignore_errors' => true,
+    ]]);
+    return @file_get_contents($url, false, $context);
+}
+
+if (($_GET['action'] ?? '') === 'ping_debug') {
+    $mapsKey = $config['google_maps_api_key'] ?? '';
+    $testUrl = 'https://maps.googleapis.com/maps/api/geocode/json?address=Brasil&key=' . urlencode($mapsKey);
+    $testStart = microtime(true);
+    $testResp = httpGetSimple($testUrl, 8);
+    $testMs = round((microtime(true) - $testStart) * 1000);
+    echo json_encode([
+        'versao_arquivo' => 'ping_debug_v1',
+        'hora_servidor' => date('Y-m-d H:i:s'),
+        'maps_key_len' => strlen($mapsKey),
+        'maps_key_inicio' => substr($mapsKey, 0, 12),
+        'teste_geocode_ms' => $testMs,
+        'teste_geocode_resultado' => $testResp === false ? 'FALSO (falhou)' : substr($testResp, 0, 200),
+    ]);
+    exit;
+}
+
 try {
     $pdo = new PDO(
         "mysql:host={$config['db_host']};dbname={$config['db_name']};charset=utf8mb4",
@@ -43,15 +69,6 @@ try {
 
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: [];
-
-function httpGetSimple(string $url, int $timeoutSeconds) {
-    $context = stream_context_create(['http' => [
-        'method' => 'GET',
-        'timeout' => $timeoutSeconds,
-        'ignore_errors' => true,
-    ]]);
-    return @file_get_contents($url, false, $context);
-}
 
 function uid(): string {
     return bin2hex(random_bytes(8));
