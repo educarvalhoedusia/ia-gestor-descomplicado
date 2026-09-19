@@ -50,6 +50,25 @@ function httpPostJson(string $url, array $headers, array $body, int $timeoutSeco
     return @file_get_contents($url, false, $context);
 }
 
+if (($_GET['action'] ?? '') === 'debug_cnpj_raw') {
+    header('Content-Type: text/plain; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    $cnpj = $_GET['cnpj'] ?? '';
+    $token = $config['casa_dos_dados_token'] ?? '';
+    $body = json_encode(['cnpj' => [$cnpj], 'tipo_resultado' => 'completo']);
+    $ctx = stream_context_create(['http' => [
+        'method' => 'POST',
+        'header' => "api-key: {$token}\r\nContent-Type: application/json\r\n",
+        'content' => $body,
+        'timeout' => 15,
+        'ignore_errors' => true,
+    ]]);
+    $resp = @file_get_contents('https://api.casadosdados.com.br/v5/cnpj/pesquisa', false, $ctx);
+    echo "ENVIADO: " . $body . "\n\n";
+    echo "RESPOSTA CRUA:\n" . ($resp === false ? 'FALHOU (file_get_contents retornou false)' : $resp) . "\n";
+    exit;
+}
+
 try {
     $pdo = new PDO(
         "mysql:host={$config['db_host']};dbname={$config['db_name']};charset=utf8mb4",
