@@ -104,7 +104,7 @@ def build_story(styles, empresa, perfil, url_exemplo):
         toc_items = [
             "O que é o Painel Comercial", "Como entrar no painel",
             "Cadastrando um novo contato (lead)", "Perfil DISC e como convencer cada perfil",
-            "Assistente de resposta com IA", "Prospectar Clientes (busca no Google Maps + IA)",
+            "Assistente de resposta com IA", "Prospectar Clientes (Google Maps + Casa dos Dados + IA)",
             "Registrando conversas e propostas",
             "Editando ou removendo um contato", "Indicadores (KPIs) e filtros",
             "Alerta de follow-up atrasado", "Exportando dados (CSV, Excel e PDF)",
@@ -115,7 +115,7 @@ def build_story(styles, empresa, perfil, url_exemplo):
         toc_items = [
             "O que é o Painel Comercial", "Como entrar no painel",
             "Cadastrando um novo contato (lead)", "Perfil DISC e como convencer cada perfil",
-            "Assistente de resposta com IA", "Prospectar Clientes (busca no Google Maps + IA)",
+            "Assistente de resposta com IA", "Prospectar Clientes (Google Maps + Casa dos Dados + IA)",
             "Registrando conversas e propostas",
             "Editando ou removendo um contato", "Indicadores (KPIs) e filtros",
             "Alerta de follow-up atrasado", "Exportando dados (CSV, Excel e PDF)",
@@ -269,23 +269,40 @@ def build_story(styles, empresa, perfil, url_exemplo):
             styles["BodySmall"]))
 
     # ---------- 3d. Prospectar Clientes ----------
-    story.append(section("Prospectar Clientes (busca no Google Maps + IA)"))
+    story.append(section("Prospectar Clientes (Google Maps + Casa dos Dados + IA)"))
     story.append(Paragraph(
         "A aba <b>\"🧭 Prospectar Clientes\"</b>, no topo do painel, ajuda a encontrar empresas em "
-        "potencial numa cidade, sem precisar já ter o contato:",
+        "potencial numa cidade, sem precisar já ter o contato. Tem duas fontes de busca, que podem "
+        "ser usadas juntas:",
         styles["Body"]))
     story.append(bullets(styles, [
-        "Informe a <b>cidade</b> e o <b>ramo de atuação</b> (ex.: \"clínica odontológica\", "
-        "\"escritório de contabilidade\", \"imobiliária\") e clique em "
-        '<b>"🔍 Buscar empresas com IA"</b>.',
-        "As empresas encontradas no Google Maps aparecem como <b>prospects</b> numa lista separada — "
-        "não entram direto como lead no CRM, para você revisar antes.",
-        "Em cada prospect, você vê endereço, telefone, site e a nota do Google.",
+        'Informe a <b>cidade</b> e o <b>ramo de atuação</b> (ex.: "clínica odontológica", '
+        '"escritório de contabilidade") e clique em <b>"🔍 Buscar no Google Maps"</b> — traz '
+        "endereço, telefone, site e a nota do Google.",
+        'Informe <b>cidade</b>, <b>UF</b> e <b>ramo</b> (ou o código <b>CNAE</b>, se você souber) e '
+        'clique em <b>"📇 Buscar por CNPJ"</b> — busca direto na base de CNPJs ativos da Casa dos '
+        "Dados e traz razão social, situação cadastral, porte, data de abertura, capital social, "
+        "sócios e, quando disponíveis, telefone e e-mail.",
     ]))
     story.append(Paragraph(
+        "Cada empresa encontrada vira um <b>prospect</b> numa lista separada — não entra direto "
+        "como lead no CRM, para você revisar antes.",
+        styles["Body"]))
+    story.append(Paragraph(
         "<i>O Google Maps não usa código CNAE (isso é uma classificação da Receita Federal) — a busca "
-        "funciona por palavra-chave/ramo de negócio, o que na prática cobre o mesmo objetivo.</i>",
+        "funciona por palavra-chave/ramo de negócio. Já a busca por CNPJ pesquisa o texto informado "
+        "dentro da razão social/nome fantasia das empresas (ou filtra direto pelo código CNAE, se "
+        "você preencher esse campo).</i>",
         styles["BodySmall"]))
+    story.append(subsection("Completando os dados de um prospect"))
+    story.append(bullets(styles, [
+        'Num prospect achado pelo Google Maps (ou por uma busca de CNPJ que trouxe poucos dados), '
+        'clique em <b>"🔎 Buscar dados completos (CNPJ)"</b> (ou "Completar dados do CNPJ") para a '
+        "plataforma procurar a empresa na Casa dos Dados pelo nome e cidade, e preencher CNPJ, razão "
+        "social, situação cadastral, porte, data de abertura, capital social e sócios.",
+        "Empresas individuais (MEI ou empresário individual) costumam não ter sócios cadastrados — "
+        "isso é esperado, não é um erro do sistema.",
+    ]))
     story.append(subsection("Abordando e convertendo um prospect"))
     story.append(bullets(styles, [
         'Clique em <b>"✉️ Gerar para E-mail"</b> ou <b>"📱 Gerar para WhatsApp"</b> para a IA escrever '
@@ -300,11 +317,14 @@ def build_story(styles, empresa, perfil, url_exemplo):
     ]))
     if perfil == "admin":
         story.append(Paragraph(
-            "Esse recurso depende de uma chave de API do Google Maps (Places API) configurada no "
-            "<b>config.php</b> (campo <code>google_maps_code</code>) e reaproveita a mesma chave "
-            "da Anthropic já usada no Assistente de resposta. Sem a chave do Google Maps, a busca "
-            "mostra uma mensagem de erro clara ao clicar — o resto do painel continua funcionando "
-            "sem problema. Consulte o README.md do projeto para o passo a passo de configuração.",
+            "A busca no Google Maps depende de uma chave de API (Places API) configurada no "
+            "<b>config.php</b> (campo <code>google_maps_code</code>). A busca por CNPJ depende de um "
+            "token da Casa dos Dados (portal.casadosdados.com.br), configurado no campo "
+            "<code>casa_dos_dados_token</code>. Ambas reaproveitam a mesma chave da Anthropic já usada "
+            "no Assistente de resposta para gerar as mensagens. Deixar qualquer uma das duas chaves em "
+            "branco desativa só aquela fonte de busca (mostra uma mensagem de erro clara ao clicar) — "
+            "o resto do painel continua funcionando sem problema. Consulte o README.md do projeto para "
+            "o passo a passo de configuração.",
             styles["BodySmall"]))
 
     story.append(PageBreak())
