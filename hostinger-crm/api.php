@@ -45,7 +45,7 @@ if (($_GET['action'] ?? '') === 'ping_debug') {
     echo "PASSO 1: PHP esta rodando. Hora do servidor: " . date('Y-m-d H:i:s') . "\n";
     @ob_flush(); @flush();
 
-    $mapsKey = $config['google_maps_api_key'] ?? '';
+    $mapsKey = $config['google_maps_code'] ?? '';
     echo "PASSO 2: chave do Maps lida do config.php. Tamanho=" . strlen($mapsKey) . " inicio=" . substr($mapsKey, 0, 12) . "\n";
     @ob_flush(); @flush();
 
@@ -509,9 +509,9 @@ switch ($action) {
         $cidade = reqStr($input['cidade'] ?? null, 'cidade');
         $ramo = reqStr($input['ramo'] ?? null, 'ramo');
 
-        $apiKey = $config['google_maps_api_key'] ?? '';
+        $apiKey = $config['google_maps_code'] ?? '';
         if (!$apiKey) {
-            fail(500, 'Chave do Google Maps não configurada. Adicione "google_maps_api_key" no config.php.');
+            fail(500, 'Chave do Google Maps não configurada. Adicione "google_maps_code" no config.php.');
         }
 
         $query = $ramo . ' em ' . $cidade;

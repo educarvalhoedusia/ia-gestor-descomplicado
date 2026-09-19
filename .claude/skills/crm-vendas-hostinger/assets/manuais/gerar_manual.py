@@ -301,7 +301,7 @@ def build_story(styles, empresa, perfil, url_exemplo):
     if perfil == "admin":
         story.append(Paragraph(
             "Esse recurso depende de uma chave de API do Google Maps (Places API) configurada no "
-            "<b>config.php</b> (campo <code>google_maps_api_key</code>) e reaproveita a mesma chave "
+            "<b>config.php</b> (campo <code>google_maps_code</code>) e reaproveita a mesma chave "
             "da Anthropic já usada no Assistente de resposta. Sem a chave do Google Maps, a busca "
             "mostra uma mensagem de erro clara ao clicar — o resto do painel continua funcionando "
             "sem problema. Consulte o README.md do projeto para o passo a passo de configuração.",

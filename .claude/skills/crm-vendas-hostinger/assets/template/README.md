@@ -230,12 +230,12 @@ contato de verdade no CRM.
 1. No Google Cloud Console, ative a **"Places API"** e configure
    faturamento (tem cota gratuita mensal).
 2. Crie uma **API Key** em "APIs e Serviços" → "Credenciais".
-3. Em `config.php`: `'google_maps_api_key' => 'SUA_CHAVE_AQUI',`
+3. Em `config.php`: `'google_maps_code' => 'SUA_CHAVE_AQUI',`
 4. Rode no phpMyAdmin a migração que cria a tabela `prospects` (veja
    `schema.sql` do projeto — a tabela já vem criada em instalações novas).
 5. Suba o `index.html` e o `api.php` atualizados.
 
-Se `google_maps_api_key` ficar em branco, a busca mostra um erro claro ao
+Se `google_maps_code` ficar em branco, a busca mostra um erro claro ao
 clicar — o resto do painel continua funcionando. A geração de mensagem
 reaproveita a mesma `anthropic_api_key` do assistente de resposta.
 

@@ -38,5 +38,5 @@ return [
     // com a "Places API" ativada e faturamento configurado (tem cota
     // gratuita mensal). Deixe em branco para desativar a aba sem quebrar o
     // resto do painel.
-    'google_maps_api_key' => '',
+    'google_maps_code' => '',
 ];

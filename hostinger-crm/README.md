@@ -296,7 +296,7 @@ antes.
    segurança, restrinja essa chave para funcionar só com a Places API.
 3. Em `config.php`, adicione:
    ```php
-   'google_maps_api_key' => 'SUA_CHAVE_AQUI',
+   'google_maps_code' => 'SUA_CHAVE_AQUI',
    ```
 4. Rode a migração SQL abaixo no phpMyAdmin (cria a tabela de prospects):
    ```sql
@@ -324,7 +324,7 @@ antes.
 5. Suba o `index.html` e o `api.php` atualizados. Pronto — a aba já
    aparece no topo do painel para todo mundo.
 
-Se `google_maps_api_key` ficar em branco, a busca mostra um erro claro ao
+Se `google_maps_code` ficar em branco, a busca mostra um erro claro ao
 clicar — o resto do painel continua funcionando sem problema. A geração
 de mensagem por IA reaproveita a mesma `anthropic_api_key` já configurada
 para o assistente de resposta.
