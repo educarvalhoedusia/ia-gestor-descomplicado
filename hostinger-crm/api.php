@@ -40,19 +40,28 @@ function httpGetSimple(string $url, int $timeoutSeconds) {
 }
 
 if (($_GET['action'] ?? '') === 'ping_debug') {
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "PASSO 1: PHP esta rodando. Hora do servidor: " . date('Y-m-d H:i:s') . "\n";
+    @ob_flush(); @flush();
+
     $mapsKey = $config['google_maps_api_key'] ?? '';
+    echo "PASSO 2: chave do Maps lida do config.php. Tamanho=" . strlen($mapsKey) . " inicio=" . substr($mapsKey, 0, 12) . "\n";
+    @ob_flush(); @flush();
+
+    echo "PASSO 3: testando conexao HTTPS com api.anthropic.com...\n";
+    @ob_flush(); @flush();
+    $t1 = microtime(true);
+    $r1 = httpGetSimple('https://api.anthropic.com', 8);
+    echo "PASSO 3 RESULTADO: " . ($r1 === false ? 'FALHOU' : 'OK') . " em " . round((microtime(true) - $t1) * 1000) . "ms\n";
+    @ob_flush(); @flush();
+
+    echo "PASSO 4: testando conexao HTTPS com maps.googleapis.com...\n";
+    @ob_flush(); @flush();
+    $t2 = microtime(true);
     $testUrl = 'https://maps.googleapis.com/maps/api/geocode/json?address=Brasil&key=' . urlencode($mapsKey);
-    $testStart = microtime(true);
-    $testResp = httpGetSimple($testUrl, 8);
-    $testMs = round((microtime(true) - $testStart) * 1000);
-    echo json_encode([
-        'versao_arquivo' => 'ping_debug_v1',
-        'hora_servidor' => date('Y-m-d H:i:s'),
-        'maps_key_len' => strlen($mapsKey),
-        'maps_key_inicio' => substr($mapsKey, 0, 12),
-        'teste_geocode_ms' => $testMs,
-        'teste_geocode_resultado' => $testResp === false ? 'FALSO (falhou)' : substr($testResp, 0, 200),
-    ]);
+    $r2 = httpGetSimple($testUrl, 8);
+    echo "PASSO 4 RESULTADO: " . ($r2 === false ? 'FALHOU' : substr($r2, 0, 300)) . " em " . round((microtime(true) - $t2) * 1000) . "ms\n";
+    echo "FIM DO TESTE.\n";
     exit;
 }
 
