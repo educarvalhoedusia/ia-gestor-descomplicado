@@ -55,6 +55,7 @@ if (($_GET['action'] ?? '') === 'debug_cnpj_raw') {
     header('Cache-Control: no-store, no-cache, must-revalidate');
     $cnpj = $_GET['cnpj'] ?? '';
     $token = $config['casa_dos_dados_token'] ?? '';
+
     $body = json_encode(['cnpj' => [$cnpj], 'tipo_resultado' => 'completo']);
     $ctx = stream_context_create(['http' => [
         'method' => 'POST',
@@ -64,8 +65,16 @@ if (($_GET['action'] ?? '') === 'debug_cnpj_raw') {
         'ignore_errors' => true,
     ]]);
     $resp = @file_get_contents('https://api.casadosdados.com.br/v5/cnpj/pesquisa', false, $ctx);
-    echo "ENVIADO: " . $body . "\n\n";
-    echo "RESPOSTA CRUA:\n" . ($resp === false ? 'FALHOU (file_get_contents retornou false)' : $resp) . "\n";
+    echo "== V5 /pesquisa ==\nENVIADO: " . $body . "\n\nRESPOSTA CRUA:\n" . ($resp === false ? 'FALHOU' : $resp) . "\n\n";
+
+    $ctx2 = stream_context_create(['http' => [
+        'method' => 'GET',
+        'header' => "api-key: {$token}\r\n",
+        'timeout' => 15,
+        'ignore_errors' => true,
+    ]]);
+    $resp2 = @file_get_contents('https://api.casadosdados.com.br/v4/cnpj/' . urlencode($cnpj), false, $ctx2);
+    echo "== V4 /cnpj/{cnpj} ==\nRESPOSTA CRUA:\n" . ($resp2 === false ? 'FALHOU' : $resp2) . "\n";
     exit;
 }
 
